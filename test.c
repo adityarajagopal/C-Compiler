@@ -8,6 +8,9 @@
 # 1 "/usr/include/stdio.h" 1 3 4
 # 22 "/usr/include/stdio.h" 3 4
 
+int a = 0702ul
+int b = 0x4432Fal
+float c = -.6e+4l
 
 # 59 "/usr/include/stdio.h" 3 4
 

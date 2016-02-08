@@ -25,8 +25,8 @@ INVALID_SHARP		#.*$
 /*constants*/
 OCTAL				0[0-7]*[uUlL]?[uUlL]?
 HEXADECIMAL			0(x|X)[0-9a-fA-F]+[uUlL]?[uUlL]?
-DECIMAL				[0-9]+[uUlL]?[uUlL]?	
-FLOAT				[0-9]*\.?[0-9]+([eE][-\+][0-9]+[lLfF]?)?
+DECIMAL				[-\+]?[0-9]+[uUlL]?[uUlL]?	
+FLOAT				[-\+]?([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][-\+]?[0-9]+[lLfF]?)?
 CHAR				\'.*\'
 STRING				\".*\"
 /*keywords*/
@@ -84,7 +84,10 @@ SPACE 				[ ]*
 {CONDITIONAL_OP}					return COND_OP;
 {PUNCTUATOR_OP}						return PUNC_OP;
 
-{NEW_LINE}							{line_num++;}
+{NEW_LINE}							{
+										line_num++;
+										src_line++;
+									}
 {PRE_SHARP}						 	return PRE_PROC;
 {TAB}								return CONSUME; 
 {SPACE}								return CONSUME;
@@ -103,6 +106,7 @@ int main()
 {
 	int lexcode = yylex();
 	std::string output; 
+	std::string consume; 
 	while(lexcode != 0)
 	{
 		switch (lexcode)
@@ -149,7 +153,7 @@ void update_file_name(char* yytext)
 	std::size_t	start = input_line.find('"');
 	std::size_t	end = input_line.find('"', start+1);
 
-	src_line = std::stoi(input_line.substr(sharp+2,(start-sharp-1)));
+	src_line = std::stoi(input_line.substr(sharp+2,(start-sharp-1))) - 1;
 	file_name = input_line.substr(start+1, (end-start-1));	
 }
 
