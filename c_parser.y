@@ -22,6 +22,7 @@ struct node
 };
 
 void print_nodes(node* root);
+void push_node(node* hdr, node* to_add);
 
 node* make_node
 (
@@ -33,7 +34,7 @@ node* make_node
 	char cval=0
 );
 
-struct node* start = NULL;
+struct node* tmp = NULL;
 %}
 
 %union 
@@ -52,7 +53,7 @@ struct node* start = NULL;
 %token IDENTIFIER
 
 %type<tree_node> file external_decl decl decl_specifiers type_specifier su_specifier type_qualifier init_list init_declarator declarator 
-%type<string> IDENTIFIER 
+%type<string> IDENTIFIER  
 
 %% 
 
@@ -65,21 +66,23 @@ decl			: decl_specifiers SEMICOLON
 				| decl_specifiers init_list SEMICOLON 
 				  {
 				  	$$ = $2;
-					$$->type = $1->type;
+					tmp = $$;
+					while(tmp != NULL)
+					{
+						tmp->type = $1->type;
+						tmp = tmp->next;
+					}
 				  }
 
-decl_specifiers	: type_specifier
+decl_specifiers	: type_specifier 
 				| type_specifier decl_specifiers 
 				| type_qualifier
 				| type_qualifier decl_specifiers
 
-type_specifier	: INT 
-				  {
-				  	$$ = make_node("int");
-				  }
+type_specifier	: INT {$$ = make_node("int");}
 				| LONG			{}
 				| FLOAT			{}
-				| DOUBLE		{}
+				| DOUBLE {$$ = make_node ("double");}
 				| VOID			{}
 				| CHAR			{}
 				| SHORT			{}
@@ -94,15 +97,12 @@ su_specifier 	: STRUCT		{}
 type_qualifier	: CONST			{}
 				| VOLATILE		{}
 
-init_list		: init_declarator 
-				| init_list COMMA init_declarator
+init_list		: init_declarator {push_node($$, $1);} 
+				| init_list COMMA init_declarator {push_node($1, $3);}
 
 init_declarator	: declarator 
 
-declarator		: IDENTIFIER 
-				  {
-				  	$$ = make_node("None", $1);
-				  }
+declarator		: IDENTIFIER {$$ = make_node("None", $1);}
 
 %%
 
@@ -149,8 +149,18 @@ void print_nodes(node* root)
 	}
 }
 
+void push_node(node* hdr, node* to_add)
+{
+	node* tmp = hdr;
+	while(tmp->next != NULL)
+	{
+		tmp = tmp->next;
+	}
+	tmp->next = to_add;
+	to_add->next = NULL;
+}
+
 int main() 
 {
 	yyparse();
-	print_nodes(start);
 }

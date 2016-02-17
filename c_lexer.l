@@ -43,8 +43,9 @@ LOGICAL_OP			&&|\|\||!
 BITWISE_OP			&|\||\^|<<|>>|~
 ASSIGNMENT_OP		=|\+=|-=|\*=|\/=|%=|\|=|&=|\^=|<<=|>>=
 CONDITIONAL_OP		\?|\:
-PUNCTUATOR_OP		\[|\]|\(|\)|\{|\}|\.\.\.|\,|\.|\-\>
+PUNCTUATOR_OP		\[|\]|\(|\)|\{|\}|\.\.\.|\.|\-\>
 SEMICOLON			;
+COMMA				\,
 /*others*/
 NEW_LINE			\n
 TAB					(\t)*
@@ -52,5 +53,7 @@ SPACE 				[ ]*
 %%
 {SEMICOLON}			return SEMICOLON;
 {INT_KWD}			return INT;
+{DOUBLE_KWD}		return DOUBLE;
 {IDENTIFIER}		{yylval.string = strdup(yytext); return IDENTIFIER;}
+{COMMA}				return COMMA;
 %%

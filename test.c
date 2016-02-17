@@ -1,2 +1,3 @@
-int x;
-int y; int z;
+double x,y,z;
+int a; int b; 
+int c;
