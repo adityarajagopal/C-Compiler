@@ -14,14 +14,15 @@ struct node
 	char char_val;
 	std::string name;
 	std::string type;
+	std::string op;
 
 	node* left;
-	node* op;
 	node* right;
 	node* next;
 };
 
-void print_nodes(node* root);
+void print_decl(node* root);
+void print_node(node* root);
 void push_node(node* hdr, node* to_add);
 
 node* make_node
@@ -61,27 +62,27 @@ node* make_node
 file			: external_decl
 	 			| file external_decl
 				;
-external_decl	: decl {print_nodes($1);} 
+external_decl	: decl {print_decl($1);} 
 				;
 decl			: decl_specifiers SEMICOLON
-				| decl_specifiers init_list SEMICOLON 
-				  {
-					$$=$2;
-					$$->type=$1->type;
-				  }
+				| decl_specifiers init_list SEMICOLON {$1->next = $2;}
 				;
 decl_specifiers	: type_specifier 
 				| type_specifier decl_specifiers 
 				;	
-type_specifier	: INT {$$ = make_node("int");}
+type_specifier	: INT {$$ = make_node("type_specifier", "int");}
 				;
 init_list		: init_declarator  
-				| init_list COMMA init_declarator {$$->next=$3;}
+				| init_declarator COMMA init_list {$1->next = $3;}
 				;
 init_declarator	: declarator  
-				| declarator EQUALS initial_val {$1->int_val=$3->int_val; $$ = $1;}
+				| declarator EQUALS initial_val 
+				  {
+					$$->op = "=";  
+					$$->right = $3;
+				  }
 				;
-declarator		: IDENTIFIER {$$ = make_node("None", $1);} 
+declarator		: IDENTIFIER {$$ = make_node("declarator", $1);} 
 				;
 initial_val		: assign_expr
 				;
@@ -127,25 +128,38 @@ node* make_node
 	new_node->d_val = dval;
 	new_node->f_val = fval;
 	new_node->char_val = cval;
+	new_node->op = "none";
 
 	new_node->left = NULL;
-	new_node->op = NULL;
 	new_node->right = NULL;
 	new_node->next = NULL;
 
 	return new_node;
 }
 
-void print_nodes(node* root)
+void print_decl(node* root)
 {
-	if(root!=NULL)
+	if(root != NULL)
 	{
-		std::cout << "Type: " << root->type << std::endl;
-		std::cout << "Name: " << root->name << std::endl;
-		std::cout << "ival: " << root->int_val << std::endl;
-		std::cout << "dval: " << root->d_val << std::endl;
-		std::cout << "fval: " << root->f_val << std::endl;
-		print_nodes(root->next);
+		if(root->type == "declarator")
+		{
+			std::cout << "VARIABLE : " << root->name << std::endl;
+			if(root->op == "=")
+			{
+				print_node(root->right);
+			}
+		}
+		print_decl(root->next);
+	}
+}
+
+void print_node(node* root)
+{
+	if(root != NULL)
+	{
+		std::cout << "name: " << root->name << std::endl;
+		std::cout << "type: " << root->type << std::endl;
+		std::cout << "int_val: " << root->int_val << std::endl;
 	}
 }
 

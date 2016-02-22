@@ -1,3 +1,2 @@
-int b;
-int c; int a;
-int d = 5;
+int b,d=4,f;
+int c=d;
