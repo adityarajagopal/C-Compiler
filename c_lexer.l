@@ -41,19 +41,38 @@ ARITHMETIC_OP		\+|-|\*|\/|%|\+\+|--
 RELATION_OP			==|!=|>|<|>=|<=
 LOGICAL_OP			&&|\|\||!
 BITWISE_OP			&|\||\^|<<|>>|~
-ASSIGNMENT_OP		=|\+=|-=|\*=|\/=|%=|\|=|&=|\^=|<<=|>>=
+ASSIGNMENT_OP		\+=|-=|\*=|\/=|%=|\|=|&=|\^=|<<=|>>=
 CONDITIONAL_OP		\?|\:
-PUNCTUATOR_OP		\[|\]|\(|\)|\{|\}|\.\.\.|\.|\-\>
+PUNCTUATOR_OP		\[|\]|\(|\)|\.\.\.|\.|\-\>
 SEMICOLON			;
 COMMA				\,
+LCURLY				\{
+RCURLY				\}
+EQUALS				=
+LBRAC				\(
+RBRAC				\)
 /*others*/
 NEW_LINE			\n
 TAB					(\t)*
 SPACE 				[ ]*
 %%
-{SEMICOLON}			return SEMICOLON;
+
+{OCTAL}             {yylval.i_num = strtol(yytext,NULL,8); return INT_VAL;}
+{HEXADECIMAL}       {yylval.i_num = strtol(yytext,NULL,16); return INT_VAL;}
+{DECIMAL}			{yylval.i_num = strtol(yytext,NULL,10); return INT_VAL;}
+{FLOAT}				{yylval.f_num = atof(yytext); return FLOAT_VAL;}
+
 {INT_KWD}			return INT;
 {DOUBLE_KWD}		return DOUBLE;
+
 {IDENTIFIER}		{yylval.string = strdup(yytext); return IDENTIFIER;}
+
+{SEMICOLON}			return SEMICOLON;
 {COMMA}				return COMMA;
+{LCURLY}			return LCURLY;
+{RCURLY}			return RCURLY;
+{EQUALS}			return EQUALS;
+{LBRAC}				return LBRAC;
+{RBRAC}				return RBRAC;
+
 %%

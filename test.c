@@ -1,3 +1,3 @@
-double x,y,z;
-int a; int b; 
-int c;
+int b;
+int c; int a;
+int d = 5;
