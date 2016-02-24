@@ -145,6 +145,7 @@ compound_statement	: LCURLY RCURLY {$$ = make_node("scope_start");}
 					  }
 					| LCURLY decl_list statement_list RCURLY 
 					  {
+						$$ = make_node("scope_start");
 					  }
 					;
 
@@ -163,10 +164,42 @@ selection_statement : IF LBRAC expr RBRAC statement
 loop_statement	: WHILE LBRAC expr RBRAC statement
 				  {
 				    $$ = make_node("loop", "while");
-					$$ -> next_loop = $5;
+					if($5->type != "scope_start")
+					{
+						$$->next_loop = make_node("scope_start");
+						$$->next_loop->next = $5;
+					}
+					else
+					{
+						$$ -> next_loop = $5;
+					}
 				  }
-				| FOR LBRAC expr_statement expr_statement RBRAC statement {}
-				| FOR LBRAC expr_statement expr_statement expr RBRAC statement {}
+				| FOR LBRAC expr_statement expr_statement RBRAC statement 
+				  {
+				  	$$ = make_node("loop", "for");
+					if($6->type != "scope_start")
+					{
+						$$->next_loop = make_node("scope_start");
+						$$->next_loop->next = $6;
+					}
+					else
+					{
+						$$ -> next_loop = $6;
+					}
+				  }
+				| FOR LBRAC expr_statement expr_statement expr RBRAC statement 
+				  {
+				  	$$ = make_node("loop", "for");
+					if($7->type != "scope_start")
+					{
+						$$->next_loop = make_node("scope_start");
+						$$->next_loop->next = $7;
+					}
+					else
+					{
+						$$ -> next_loop = $7;
+					}
+				  }
 				;
 
 expr_statement 	: SEMICOLON {}
@@ -274,8 +307,9 @@ void print_func(node* root)
 			{
 				std::cout << "FUNCTION : " << root->name << std::endl;
 				print_arguments(root->right);
-				std::cout << "SCOPE" << std::endl;
-				print_scope(root->next);
+				//std::cout << "SCOPE" << std::endl;
+				//print_scope(root->next);
+				print_stat_list(root->next);
 			}
 			print_func(root->next);
 		}
@@ -290,7 +324,7 @@ void print_arguments(node* root)
 		print_arguments(root->next);
 	}
 }
-
+/*
 void print_scope(node* root)
 {
 	if(root != NULL)
@@ -313,7 +347,7 @@ void print_scope(node* root)
 		}
 	}
 }
-
+/*
 void print_loop(node* root)
 {
 	if(root != NULL)
@@ -337,7 +371,16 @@ void print_loop(node* root)
 		print_loop(root->next_loop);
 	}
 }
+*/
 
+void print_loop(node* root)
+{
+	if(root->next_loop != NULL)
+	{
+		print_stat_list(root->next_loop);
+	}
+
+}
 void print_stat_list(node* root)
 {
 	if (root != NULL)
@@ -345,11 +388,25 @@ void print_stat_list(node* root)
 		if(root->type == "assignment_expression")
 		{
 			std::cout << "VARIABLE : " << root->left->name << std::endl;
+			print_stat_list(root->next_statement);
 		}
-		print_stat_list(root->next_statement);
+		else if(root->type == "loop")
+		{
+			print_loop(root);
+		}
+		else if(root->type == "scope_start")
+		{
+			std::cout << "SCOPE" << std::endl;
+			print_stat_list(root->next);
+		}
+		else if(root->type == "type_specifier")
+		{
+			print_decl(root);
+			print_stat_list(root->next_decl);
+		}
 	}
 }
-
+/*
 void print_decl_list(node* root)
 {
 	if(root != NULL)
@@ -361,7 +418,7 @@ void print_decl_list(node* root)
 		print_decl_list(root->next_decl);
 	}
 }
-
+*/
 int main() 
 {
 	yyparse();
