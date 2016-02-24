@@ -21,13 +21,17 @@ struct node
 	node* next;
 	node* next_decl;
 	node* next_statement;
+	node* next_loop;
 };
 
 void print_decl(node* root);
+void print_decl_list(node* root);
 void print_node(node* root);
 void print_func(node* root);
 void print_arguments(node* root);
 void print_scope(node* root);
+void print_stat_list(node* root);
+void print_loop(node* root);
 
 node* make_node
 (
@@ -55,10 +59,10 @@ node* make_node
 %token LONG UNSIGNED SIGNED CONST SHORT
 %token VOID STRUCT UNION CHAR TYPEDEF VOLATILE
 %token IDENTIFIER INT_VAL FLOAT_VAL STRING_LIT
-%token IF ELSE
+%token IF ELSE FOR WHILE
 
-%type<tree_node> file external_decl decl decl_specifiers type_specifier init_list init_declarator declarator initial_val assign_expr expr unary_expr postfix_expr primary_expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement 
-%type<string> IDENTIFIER assign_oper
+%type<tree_node> file external_decl decl decl_specifiers type_specifier init_list init_declarator declarator initial_val assign_expr expr unary_expr postfix_expr primary_expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement 
+%type<string> IDENTIFIER EQUALS assign_oper
 %type<i_num> INT_VAL
 
 
@@ -113,6 +117,7 @@ statement_list	: statement
 statement		: compound_statement 
 				| expr_statement
 				| selection_statement
+				| loop_statement
 				;
 
 declarator		: IDENTIFIER {$$ = make_node("declarator", $1);}
@@ -130,15 +135,17 @@ param_decl		: decl_specifiers declarator {$1->right = $2;}
 compound_statement	: LCURLY RCURLY {$$ = make_node("scope_start");}
 					| LCURLY statement_list RCURLY 
 					  {
-					  	$$ = make_node("scope_start");
-						$$ -> next_statement = $2;
+					  	$$ = make_node("scope_start", "statement");
+						$$ -> next = $2;
 					  }
 					| LCURLY decl_list RCURLY 
 					  {
-					  	$$ = make_node("scope_start");
-						$$->next_decl = $2;
+					  	$$ = make_node("scope_start", "declaration");
+						$$->next = $2;
 					  }
-					| LCURLY decl_list statement_list RCURLY {}
+					| LCURLY decl_list statement_list RCURLY 
+					  {
+					  }
 					;
 
 initial_val		: assign_expr
@@ -153,23 +160,34 @@ selection_statement : IF LBRAC expr RBRAC statement
 					| IF LBRAC expr RBRAC statement ELSE statement {}
 					;
 
+loop_statement	: WHILE LBRAC expr RBRAC statement
+				  {
+				    $$ = make_node("loop", "while");
+					$$ -> next_loop = $5;
+				  }
+				| FOR LBRAC expr_statement expr_statement RBRAC statement {}
+				| FOR LBRAC expr_statement expr_statement expr RBRAC statement {}
+				;
+
 expr_statement 	: SEMICOLON {}
 				| expr SEMICOLON {}
 				;
 
-expr			: assign_expr
+expr			: assign_expr {}
 				| expr COMMA assign_expr {}
 				;
 
 assign_expr		: unary_expr  //in the true grammar, this is a conditional_expr whcih can boil down to unary_expr
 				| unary_expr assign_oper assign_expr 
 				  {
-					//$1->op = assign_oper;
-					//$1->right = assign_expr;
+				  	$$ = make_node("assignment_expression");
+					$$->left = $1;
+					$$->op = $2;
+					$$->right = $3;
 				  }
 				;
 
-assign_oper		: EQUALS {}
+assign_oper		: EQUALS {$$ = $1;}
 				;
 
 unary_expr		: postfix_expr
@@ -178,8 +196,8 @@ unary_expr		: postfix_expr
 postfix_expr	: primary_expr
 				;
 
-primary_expr	: IDENTIFIER {$$ = make_node("None", $1);}
-				| INT_VAL {$$ = make_node("None", "None", $1);}
+primary_expr	: IDENTIFIER {$$ = make_node("primary_expression", $1);}
+				| INT_VAL {$$ = make_node("primary_expression", "integer", $1);}
 				| LBRAC expr RBRAC {}
 				;
 %%
@@ -277,11 +295,70 @@ void print_scope(node* root)
 {
 	if(root != NULL)
 	{
+		if(root->name == "declaration")
+		{
+			print_decl_list(root->next);
+		}
+		else if(root->name == "statement")
+		{
+			if(root->next->type == "loop")
+			{
+				std::cout << "SCOPE" << std::endl;
+				print_loop(root->next);
+			}
+			else
+			{
+				print_stat_list(root->next);
+			}
+		}
+	}
+}
+
+void print_loop(node* root)
+{
+	if(root != NULL)
+	{
+		if(root->name == "statement")
+		{
+			if(root->next->type == "loop")
+			{
+				std::cout << "SCOPE" << std::endl;
+				print_loop(root->next);
+			}
+			else
+			{
+				print_stat_list(root->next);
+			}
+		}
+		else if(root->name == "declaration")
+		{
+			print_decl_list(root->next);
+		}
+		print_loop(root->next_loop);
+	}
+}
+
+void print_stat_list(node* root)
+{
+	if (root != NULL)
+	{
+		if(root->type == "assignment_expression")
+		{
+			std::cout << "VARIABLE : " << root->left->name << std::endl;
+		}
+		print_stat_list(root->next_statement);
+	}
+}
+
+void print_decl_list(node* root)
+{
+	if(root != NULL)
+	{
 		if(root->type == "type_specifier")
 		{
 			print_decl(root);
 		}
-		print_scope(root->next_decl);
+		print_decl_list(root->next_decl);
 	}
 }
 
