@@ -25,6 +25,7 @@ struct node
 	node* compound_next;
 	node* if_next;
 	node* else_next;
+	node* jump_next;
 };
 
 void print_decl(node* root, int tab);
@@ -62,10 +63,11 @@ node* make_node
 %token VOID STRUCT UNION CHAR TYPEDEF VOLATILE
 %token IDENTIFIER INT_VAL FLOAT_VAL STRING_LIT
 %token IF ELSE FOR WHILE
+%token GOTO CONTINUE BREAK RETURN 
 %token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS ADD SUB MULT DIV MOD
 %token QUESTION_MARK COLON OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT INC DEC BW_NOT NOT
 
-%type<tree_node> file external_decl decl decl_specifiers type_specifier init_list init_declarator declarator initial_val assign_expr expr unary_expr postfix_expr primary_expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement conditional_expr logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr
+%type<tree_node> file external_decl decl decl_specifiers type_specifier init_list init_declarator declarator initial_val assign_expr expr unary_expr postfix_expr primary_expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement conditional_expr logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr jump_statement
 %type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT
 %type<i_num> INT_VAL
 
@@ -122,6 +124,7 @@ statement		: compound_statement
 				| expr_statement
 				| selection_statement
 				| loop_statement
+				| jump_statement
 				;
 
 declarator		: IDENTIFIER {$$ = make_node("declarator", $1);}
@@ -246,7 +249,25 @@ expr_statement 	: SEMICOLON {}
 				| expr SEMICOLON {}
 				;
 
-expr			: assign_expr {}
+jump_statement	: GOTO IDENTIFIER SEMICOLON 
+				  {
+				  	$$ = make_node("jump", "goto"); 
+				   	$$->jump_next = make_node("primary_expr", $2);
+				  }
+				| CONTINUE SEMICOLON {$$ = make_node("jump", "continue");}
+				| BREAK SEMICOLON {$$ = make_node("jump", "break");}
+				| RETURN SEMICOLON 
+				  {
+				  	$$ = make_node("jump", "return");
+				  }
+				| RETURN expr SEMICOLON 
+				  {
+				  	$$ = make_node("jump", "return");
+				  	$$->jump_next = $2;
+				  }
+				;
+
+expr			: assign_expr 
 				| expr COMMA assign_expr {}
 				;
 
@@ -472,6 +493,11 @@ void print_stat_list(node* root, int tab)
 			print_stat_list(root->else_next, tab);
 			print_stat_list(root->next_statement, tab);
 		}
+		else if(root->type == "jump")
+		{
+			print_stat_list(root->jump_next, tab);
+			print_stat_list(root->next_statement, tab);
+		}
 		else if(root->type == "scope_start")
 		{
 			print_tab(tab);
@@ -484,6 +510,10 @@ void print_stat_list(node* root, int tab)
 			print_decl(root, tab);
 			print_stat_list(root->next_decl, tab);
 			print_stat_list(root->compound_next, tab);
+		}
+		else
+		{
+			print_stat_list(root->next_statement, tab);
 		}
 	}
 }
