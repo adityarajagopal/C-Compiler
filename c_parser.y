@@ -62,10 +62,11 @@ node* make_node
 %token VOID STRUCT UNION CHAR TYPEDEF VOLATILE
 %token IDENTIFIER INT_VAL FLOAT_VAL STRING_LIT
 %token IF ELSE FOR WHILE
-%token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS 
+%token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS ADD SUB MULT DIV MOD
+%token QUESTION_MARK COLON OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT INC DEC BW_NOT NOT
 
-%type<tree_node> file external_decl decl decl_specifiers type_specifier init_list init_declarator declarator initial_val assign_expr expr unary_expr postfix_expr primary_expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement 
-%type<string> IDENTIFIER assign_oper
+%type<tree_node> file external_decl decl decl_specifiers type_specifier init_list init_declarator declarator initial_val assign_expr expr unary_expr postfix_expr primary_expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement conditional_expr logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr
+%type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT
 %type<i_num> INT_VAL
 
 
@@ -249,7 +250,7 @@ expr			: assign_expr {}
 				| expr COMMA assign_expr {}
 				;
 
-assign_expr		: unary_expr
+assign_expr		: conditional_expr
 				| unary_expr assign_oper assign_expr 
 				  {
 				  	$$ = make_node("assignment_expression");
@@ -272,10 +273,75 @@ assign_oper		: EQUALS {}
 				| OR_EQUALS {}
 				;
 
+conditional_expr : logical_or_expr
+			     | logical_or_expr QUESTION_MARK expr COLON conditional_expr
+				 ;
+
+logical_or_expr : logical_and_expr
+				| logical_or_expr OR logical_and_expr
+				;
+
+logical_and_expr : incl_or_expr
+				 | logical_and_expr AND incl_or_expr
+				 ;
+
+incl_or_expr 	: excl_or_expr
+				| incl_or_expr BW_OR excl_or_expr
+				;
+
+excl_or_expr	: and_expr
+				| excl_or_expr BW_XOR and_expr
+				;
+
+and_expr		: bool_equal_expr
+				| and_expr BW_AND bool_equal_expr
+				;
+
+bool_equal_expr : comparison_expr
+				| bool_equal_expr EQUAL_EQUAL comparison_expr
+				| bool_equal_expr NOT_EQUAL comparison_expr
+				;
+
+comparison_expr : shift_expr
+				| comparison_expr LT shift_expr
+				| comparison_expr GT shift_expr
+				| comparison_expr LE shift_expr
+				| comparison_expr GE shift_expr
+				;
+
+shift_expr 		: addsub_expr
+				| shift_expr LEFT_SHIFT addsub_expr
+				| shift_expr RIGHT_SHIFT addsub_expr
+				;
+
+addsub_expr		: multdivmod_expr
+				| addsub_expr ADD multdivmod_expr
+				| addsub_expr SUB multdivmod_expr
+				;
+
+multdivmod_expr : unary_expr
+				| multdivmod_expr MULT unary_expr
+				| multdivmod_expr DIV unary_expr
+				| multdivmod_expr MOD unary_expr
+				;
+
 unary_expr		: postfix_expr
+				| INC unary_expr {$$ = $2;}
+				| DEC unary_expr {$$ = $2;}
+				| unary_oper unary_expr {$$ = $2;}
+				;
+
+unary_oper		: BW_AND
+				| MULT
+				| ADD 
+				| SUB
+				| BW_NOT
+				| NOT
 				;
 
 postfix_expr	: primary_expr
+				| postfix_expr INC
+				| postfix_expr DEC
 				;
 
 primary_expr	: IDENTIFIER {$$ = make_node("primary_expression", $1);}
