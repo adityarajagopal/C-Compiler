@@ -522,6 +522,7 @@ void print_stat_list(node* root, int tab)
 			std::cout << "SCOPE" << std::endl;
 			tab++;
 			print_stat_list(root->compound_next, tab);
+			print_stat_list(root->next_statement, tab);
 		}
 		else if(root->type == "type_specifier")
 		{
@@ -529,6 +530,7 @@ void print_stat_list(node* root, int tab)
 			print_stat_list(root->next_decl, tab);
 			print_stat_list(root->compound_next, tab);
 			print_stat_list(root->next_loop, tab);
+			print_stat_list(root->next_statement, tab);
 		}
 		else
 		{
