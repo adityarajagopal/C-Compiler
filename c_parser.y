@@ -27,14 +27,13 @@ struct node
 	node* else_next;
 };
 
-void print_decl(node* root);
-void print_decl_list(node* root);
+void print_decl(node* root, int tab);
+void print_func(node* root, int tab);
+void print_arguments(node* root, int tab);
+void print_stat_list(node* root, int tab);
+void print_loop(node* root, int tab);
 void print_node(node* root);
-void print_func(node* root);
-void print_arguments(node* root);
-void print_scope(node* root);
-void print_stat_list(node* root);
-void print_loop(node* root);
+void print_tab(int tab);
 
 node* make_node
 (
@@ -57,15 +56,16 @@ node* make_node
 	struct node* tree_node;
 }
 
-%token SEMICOLON COMMA LCURLY RCURLY LBRAC RBRAC EQUALS
+%token SEMICOLON COMMA LCURLY RCURLY LBRAC RBRAC
 %token INT FLOAT DOUBLE BOOL
 %token LONG UNSIGNED SIGNED CONST SHORT
 %token VOID STRUCT UNION CHAR TYPEDEF VOLATILE
 %token IDENTIFIER INT_VAL FLOAT_VAL STRING_LIT
 %token IF ELSE FOR WHILE
+%token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS 
 
 %type<tree_node> file external_decl decl decl_specifiers type_specifier init_list init_declarator declarator initial_val assign_expr expr unary_expr postfix_expr primary_expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement 
-%type<string> IDENTIFIER EQUALS assign_oper
+%type<string> IDENTIFIER assign_oper
 %type<i_num> INT_VAL
 
 
@@ -75,8 +75,8 @@ file			: external_decl
 	 			| file external_decl 
 				;
 
-external_decl	: function_def {print_func($1);} 
-				| decl {print_decl($1);} 
+external_decl	: function_def {print_func($1, 0);} 
+				| decl {print_decl($1, 0);} 
 				;
 
 function_def	: decl_specifiers declarator compound_statement 
@@ -249,7 +249,7 @@ expr			: assign_expr {}
 				| expr COMMA assign_expr {}
 				;
 
-assign_expr		: unary_expr  //in the true grammar, this is a conditional_expr whcih can boil down to unary_expr
+assign_expr		: unary_expr
 				| unary_expr assign_oper assign_expr 
 				  {
 				  	$$ = make_node("assignment_expression");
@@ -259,7 +259,17 @@ assign_expr		: unary_expr  //in the true grammar, this is a conditional_expr whc
 				  }
 				;
 
-assign_oper		: EQUALS {$$ = $1;}
+assign_oper		: EQUALS {}
+				| MUL_EQUALS {}
+				| DIV_EQUALS {}
+				| MOD_EQUALS {}
+				| ADD_EQUALS {}
+				| SUB_EQUALS {}
+				| LEFT_EQUALS {}
+				| RIGHT_EQUALS {}
+				| AND_EQUALS {}
+				| XOR_EQUALS {}
+				| OR_EQUALS {}
 				;
 
 unary_expr		: postfix_expr
@@ -317,25 +327,28 @@ void print_node(node* root)
 	}
 }
 
-void print_decl(node* root)
+void print_tab(int tab)
+{
+	for(int i=0; i<tab; i++)
+	{
+		std::cout << "    ";
+	}
+}
+
+void print_decl(node* root, int tab)
 {
 	if(root != NULL)
 	{
 		if(root->type == "declarator")
 		{
+			print_tab(tab);
 			std::cout << "VARIABLE : " << root->name << std::endl;
-			/*
-			if(root->op == "=")
-			{
-				print_node(root->right);
-			}
-			*/
 		}
-		print_decl(root->next);
+		print_decl(root->next, tab);
 	}
 }
 
-void print_func(node* root)
+void print_func(node* root, int tab)
 {
 	if(root != NULL)
 	{
@@ -344,60 +357,67 @@ void print_func(node* root)
 			if(root->type == "declarator")
 			{
 				std::cout << "FUNCTION : " << root->name << std::endl;
-				print_arguments(root->right);
-				print_stat_list(root->next);
+				tab++;
+				print_arguments(root->right, tab);
+				tab--;
+				print_stat_list(root->next, tab);
 			}
-			print_func(root->next);
+			print_func(root->next, tab);
 		}
 	}
 }
 
-void print_arguments(node* root)
+void print_arguments(node* root, int tab)
 {
 	if(root != NULL)
 	{
-		std::cout << "\tPARAMETER : " << root->right->name << std::endl;
-		print_arguments(root->next);
+		print_tab(tab);
+		std::cout << "PARAMETER : " << root->right->name << std::endl;
+		print_arguments(root->next, tab);
 	}
 }
 
-void print_loop(node* root)
+void print_loop(node* root, int tab)
 {
 	if(root->next_loop != NULL)
 	{
-		print_stat_list(root->next_loop);
+		print_stat_list(root->next_loop, tab);
 	}
 
 }
-void print_stat_list(node* root)
+void print_stat_list(node* root, int tab)
 {
 	if (root != NULL)
 	{
 		if(root->type == "assignment_expression")
 		{
-			std::cout << "VARIABLE : " << root->left->name << std::endl;
-			print_stat_list(root->next_statement);
+			//print_tab(tab);
+			//std::cout << "VARIABLE : " << root->left->name << std::endl;
+			//print_node(root->next_statement->next_loop->compound_next->right);
+			print_stat_list(root->next_statement, tab);
 		}
 		else if(root->type == "loop")
 		{
-			print_loop(root);
+			print_loop(root, tab);
 		}
 		else if(root->type == "selection")
 		{
-			print_stat_list(root->if_next);
-			print_stat_list(root->else_next);
-			print_stat_list(root->next_statement);
+			print_stat_list(root->if_next, tab);
+			print_stat_list(root->else_next, tab);
+			print_stat_list(root->next_statement, tab);
 		}
 		else if(root->type == "scope_start")
 		{
+			print_tab(tab);
 			std::cout << "SCOPE" << std::endl;
-			print_stat_list(root->compound_next);
+			tab++;
+			print_stat_list(root->compound_next, tab);
 		}
 		else if(root->type == "type_specifier")
 		{
-			print_decl(root);
-			print_stat_list(root->next_decl);
-			print_stat_list(root->compound_next);
+			print_decl(root, tab);
+			print_stat_list(root->next_decl, tab);
+			print_stat_list(root->compound_next, tab);
 		}
 	}
 }
