@@ -23,6 +23,8 @@ struct node
 	node* next_statement;
 	node* next_loop;
 	node* compound_next;
+	node* if_next;
+	node* else_next;
 };
 
 void print_decl(node* root);
@@ -158,10 +160,44 @@ initial_val		: assign_expr
 selection_statement : IF LBRAC expr RBRAC statement 
 					  {
 					  	$$ = make_node("selection", "if");
-						$$->right = $3; 
-						$$->next = $5;
+						if($5->type != "scope_start")
+						{
+							$$->if_next = make_node("scope_start");
+							$$->if_next->compound_next = $5;
+						}
+						else
+						{
+							$$->if_next = $5;
+						}
 					  }
-					| IF LBRAC expr RBRAC statement ELSE statement {}
+					| IF LBRAC expr RBRAC statement ELSE statement 
+					  {
+					  	$$ = make_node("selection", "if");
+						if($5->type != "scope_start")
+						{
+							$$->if_next = make_node("scope_start");
+							$$->if_next->compound_next = $5;
+						}
+						else
+						{
+							$$->if_next = $5;
+						}
+						if($7->type != "scope_start")
+						{
+							if($7->type == "selection")
+							{$$->else_next = $7;}
+							else
+							{
+								$$->else_next = make_node("scope_start");
+								$$->else_next->compound_next = $7; 
+							}
+						}
+						else
+						{
+							$$->else_next = $7;
+						}
+							
+					  }
 					;
 
 loop_statement	: WHILE LBRAC expr RBRAC statement
@@ -345,6 +381,12 @@ void print_stat_list(node* root)
 		else if(root->type == "loop")
 		{
 			print_loop(root);
+		}
+		else if(root->type == "selection")
+		{
+			print_stat_list(root->if_next);
+			print_stat_list(root->else_next);
+			print_stat_list(root->next_statement);
 		}
 		else if(root->type == "scope_start")
 		{
