@@ -165,6 +165,7 @@ initial_val		: assign_expr
 selection_statement : IF LBRAC expr RBRAC statement 
 					  {
 					  	$$ = make_node("selection", "if");
+						/*
 						if($5->type != "scope_start")
 						{
 							$$->if_next = make_node("scope_start");
@@ -174,10 +175,13 @@ selection_statement : IF LBRAC expr RBRAC statement
 						{
 							$$->if_next = $5;
 						}
+						*/
+						$$->if_next = $5;
 					  }
 					| IF LBRAC expr RBRAC statement ELSE statement 
 					  {
 					  	$$ = make_node("selection", "if");
+						/*
 						if($5->type != "scope_start")
 						{
 							$$->if_next = make_node("scope_start");
@@ -187,6 +191,9 @@ selection_statement : IF LBRAC expr RBRAC statement
 						{
 							$$->if_next = $5;
 						}
+						*/
+						$$->if_next = $5;
+						/*
 						if($7->type != "scope_start")
 						{
 							if($7->type == "selection")
@@ -201,13 +208,15 @@ selection_statement : IF LBRAC expr RBRAC statement
 						{
 							$$->else_next = $7;
 						}
-							
+						*/
+						$$->else_next = $7;
 					  }
 					;
 
 loop_statement	: WHILE LBRAC expr RBRAC statement
 				  {
 				    $$ = make_node("loop", "while");
+					/*
 					if($5->type != "scope_start")
 					{
 						$$->next_loop = make_node("scope_start");
@@ -217,10 +226,13 @@ loop_statement	: WHILE LBRAC expr RBRAC statement
 					{
 						$$ -> next_loop = $5;
 					}
+					*/
+					$$->next_loop = $5;
 				  }
 				| FOR LBRAC expr_statement expr_statement RBRAC statement 
 				  {
 				  	$$ = make_node("loop", "for");
+					/*
 					if($6->type != "scope_start")
 					{
 						$$->next_loop = make_node("scope_start");
@@ -230,10 +242,13 @@ loop_statement	: WHILE LBRAC expr RBRAC statement
 					{
 						$$ -> next_loop = $6;
 					}
+					*/
+					$$->next_loop = $6;
 				  }
 				| FOR LBRAC expr_statement expr_statement expr RBRAC statement 
 				  {
 				  	$$ = make_node("loop", "for");
+					/*
 					if($7->type != "scope_start")
 					{
 						$$->next_loop = make_node("scope_start");
@@ -243,6 +258,8 @@ loop_statement	: WHILE LBRAC expr RBRAC statement
 					{
 						$$ -> next_loop = $7;
 					}
+					*/
+					$$->next_loop = $7;
 				  }
 				;
 
