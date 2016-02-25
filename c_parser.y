@@ -1,3 +1,4 @@
+%define parse.error verbose
 %{
 #include <iostream> 
 #include <string>
@@ -480,12 +481,12 @@ void print_stat_list(node* root, int tab)
 		{
 			//print_tab(tab);
 			//std::cout << "VARIABLE : " << root->left->name << std::endl;
-			//print_node(root->next_statement->next_loop->compound_next->right);
 			print_stat_list(root->next_statement, tab);
 		}
 		else if(root->type == "loop")
 		{
-			print_loop(root, tab);
+			print_stat_list(root->next_loop, tab);
+			print_stat_list(root->next_statement, tab);
 		}
 		else if(root->type == "selection")
 		{
@@ -510,6 +511,7 @@ void print_stat_list(node* root, int tab)
 			print_decl(root, tab);
 			print_stat_list(root->next_decl, tab);
 			print_stat_list(root->compound_next, tab);
+			print_stat_list(root->next_loop, tab);
 		}
 		else
 		{
