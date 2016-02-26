@@ -13,7 +13,7 @@ FLOAT				([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][-\+]?[0-9]+[lLfF]?)?
 CHAR				\'[^']*\'
 STRING				\"(\\.|[^\\"])*\"
 /*keywords*/
-USER_DEF_KWD		enum
+ENUM_KWD			enum
 INT_KWD				int
 CHAR_KWD			char
 FLOAT_KWD			float
@@ -32,9 +32,14 @@ IF_KWD				if
 ELSE_KWD			else
 WHILE_KWD			while
 FOR_KWD				for
-STORAGE_CLASS_KWD	auto|extern|register|static
-LOOP_KWD			do
-DESCISION_KWD		switch|case|default
+AUTO_KWD			auto
+EXTERN_KWD			extern
+REGISTER_KWD		register
+STATIC_KWD			static
+DO_KWD				do
+SWITCH_KWD			switch
+CASE_KWD			case
+DEFAULT_KWD			default
 GOTO 				goto
 CONTINUE			continue
 BREAK 				break 
@@ -149,6 +154,32 @@ SPACE 				[ ]*
 {CONTINUE}			{return CONTINUE;}
 {BREAK}				{return BREAK;}
 {RETURN}			{return RETURN;}
+
+{ENUM_KWD}			{return ENUM;}
+{CHAR_KWD}			{return CHAR_KWD;}
+{FLOAT_KWD}			{return FLOAT_KWD;}
+{DOUBLE_KWD}		{return DOUBLE_KWD;}
+{SIGNED_KWD}		{return SIGNED;}
+{UNSIGNED_KWD}		{return UNSIGNED;}
+{SHORT_KWD}			{return SHORT;}
+{LONG_KWD}			{return LONG;}
+{TYPEDEF_KWD}		{return TYPEDEF;}
+{STRUCT_KWD}		{return STRUCT;}
+{UNION_KWD}			{return UNION;}
+{VOID_KWD}			{return VOID;}
+{CONST_KWD}			{return CONST;}
+{VOLATILE_KWD}		{return VOLATILE;}
+{AUTO_KWD}			{return AUTO;}
+{EXTERN_KWD}		{return EXTERN;}
+{REGISTER_KWD}		{return REGISTER;}
+{STATIC_KWD}		{return STATIC;}
+{DO_KWD}			{return DO;}
+{SWITCH_KWD}		{return SWITCH;}
+{CASE_KWD}			{return CASE;}
+{DEFAULT_KWD}		{return DEFAULT;}
+{GOTO}				{return GOTO;}
+{CONTINUE}			{return CONTINUE;}
+{SIZEOF}			{return SIZEOF;}
 
 {IDENTIFIER}		{yylval.string = strdup(yytext); return IDENTIFIER;}
 
