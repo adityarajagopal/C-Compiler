@@ -182,5 +182,6 @@ SPACE 				[ ]*
 {IDENTIFIER}		{yylval.string = strdup(yytext); return IDENTIFIER;}
 
 {TAB}|{SPACE}|{NEW_LINE}		{}
+{PRE_SHARP}|{INVALID_SHARP}		{}
 
 %%
