@@ -1,0 +1,19 @@
+test1 : declarations with different initialiser types
+test2 : declaraion and function definition
+test3 : declaration and declarations within func
+test4 : declaration and statements within func 
+test5 : function with while loop and statements 
+test6 : function with while loop and declarations
+test7 : function with nested while loops
+test8 : function with nested while and for loops
+test9 : function with nested while and for with scopes and no scopes
+test10 : function with nexted for and while loops with scopes, no scopes, decl, and statements
+test11 : function with nested while, for, if, else if else
+test12 : function with nested loops and if and else
+test13 : function with long nesting with naked scope 
+test14 : function with long nesting of loops, selection and naked scope
+test15 : basic while and for loop with only statements inside
+test16 : long ass nesting of loops
+test17 : long ass nesting of loops and selection
+test18 : basic nesting and testing of different operator recognition
+test19 : testing of char, float and string  

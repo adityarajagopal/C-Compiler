@@ -1,0 +1,14 @@
+VARIABLE : a
+VARIABLE : b
+VARIABLE : d
+VARIABLE : f
+VARIABLE : c
+FUNCTION : test
+    PARAMETER : a
+    PARAMETER : b
+    PARAMETER : c
+SCOPE
+    SCOPE
+        VARIABLE : decl
+        SCOPE
+            VARIABLE : new
