@@ -75,7 +75,8 @@ RIGHT_EQUALS 		>>=
 AND_EQUALS			&=
 OR_EQUALS			\|=
 XOR_EQUALS			\^=
-CONDITIONAL_OP		\?|\:
+QUESTION_MARK		\?
+COLON				\:
 PUNCTUATOR_OP		\[|\]|\(|\)|\.\.\.|\.|\-\>
 SEMICOLON			;
 COMMA				\,
@@ -129,6 +130,8 @@ SPACE 				[ ]*
 {XOR_EQUALS}		{yylval.string = strdup(yytext); return XOR_EQUALS;}
 {LBRAC}				{return LBRAC;}
 {RBRAC}				{return RBRAC;}
+{QUESTION_MARK}		{yylval.string = strdup(yytext); return QUESTION_MARK;}
+{COLON}				{yylval.string = strdup(yytext); return COLON;}
 
 {OCTAL}             {yylval.i_num = strtol(yytext,NULL,8); return INT_VAL;}
 {HEXADECIMAL}       {yylval.i_num = strtol(yytext,NULL,16); return INT_VAL;}
