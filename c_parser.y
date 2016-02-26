@@ -61,7 +61,7 @@ node* make_node
 %token SEMICOLON COMMA LCURLY RCURLY LBRAC RBRAC
 %token INT FLOAT DOUBLE BOOL
 %token LONG UNSIGNED SIGNED CONST SHORT
-%token VOID STRUCT UNION CHAR TYPEDEF VOLATILE
+%token VOID STRUCT UNION CHAR TYPEDEF VOLATILE STRING
 %token IDENTIFIER INT_VAL FLOAT_VAL STRING_LIT
 %token IF ELSE FOR WHILE
 %token GOTO CONTINUE BREAK RETURN 
@@ -71,6 +71,7 @@ node* make_node
 %type<tree_node> file external_decl decl decl_specifiers type_specifier init_list init_declarator declarator initial_val assign_expr expr unary_expr postfix_expr primary_expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement conditional_expr logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr jump_statement
 %type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT
 %type<i_num> INT_VAL
+%type<f_num> FLOAT_VAL
 
 
 %% 
@@ -385,6 +386,9 @@ postfix_expr	: primary_expr
 
 primary_expr	: IDENTIFIER {$$ = make_node("primary_expression", $1);}
 				| INT_VAL {$$ = make_node("primary_expression", "integer", $1);}
+				| FLOAT_VAL {$$ = make_node("primary_expression", "float", 0, 0, $1);}
+				| CHAR {$$ = make_node("primary_expression", "char");}
+				| STRING {$$ = make_node("primary_expression", "string");}
 				| LBRAC expr RBRAC {}
 				;
 %%

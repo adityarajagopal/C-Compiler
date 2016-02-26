@@ -9,7 +9,7 @@ INVALID_SHARP		#.*$
 OCTAL				0[0-7]*([uU][l|ll|LL|L]?|[l|L|ll|LL][uU]?)?
 HEXADECIMAL			0(x|X)[0-9a-fA-F]+*([uU][l|ll|LL|L]?|[l|L|ll|LL][uU]?)?
 DECIMAL				[0-9]+([uU][l|ll|LL|L]?|[l|L|ll|LL][uU]?)?
-FLOAT				[0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][-\+]?[0-9]+[lLfF]?
+FLOAT				([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][-\+]?[0-9]+[lLfF]?)?
 CHAR				\'[^']*\'
 STRING				\"(\\.|[^\\"])*\"
 /*keywords*/
@@ -90,28 +90,6 @@ TAB					(\t)*
 SPACE 				[ ]*
 %%
 
-{SEMICOLON}			return SEMICOLON;
-{COMMA}				return COMMA;
-{LCURLY}			return LCURLY;
-{RCURLY}			return RCURLY;
-{EQUALS}			{yylval.string = strdup(yytext); return EQUALS;}
-{MUL_EQUALS} 		{yylval.string = strdup(yytext); return MUL_EQUALS;}
-{DIV_EQUALS}		{yylval.string = strdup(yytext); return DIV_EQUALS;} 
-{MOD_EQUALS}	   	{yylval.string = strdup(yytext); return MOD_EQUALS;}	 	
-{ADD_EQUALS}		{yylval.string = strdup(yytext); return ADD_EQUALS;}	
-{SUB_EQUALS}		{yylval.string = strdup(yytext); return SUB_EQUALS;}
-{LEFT_EQUALS}		{yylval.string = strdup(yytext); return LEFT_EQUALS;}
-{RIGHT_EQUALS}		{yylval.string = strdup(yytext); return RIGHT_EQUALS;} 
-{AND_EQUALS}		{yylval.string = strdup(yytext); return AND_EQUALS;}	
-{OR_EQUALS}			{yylval.string = strdup(yytext); return OR_EQUALS;}
-{XOR_EQUALS}		{yylval.string = strdup(yytext); return XOR_EQUALS;}
-{LBRAC}				return LBRAC;
-{RBRAC}				return RBRAC;
-{OCTAL}             {yylval.i_num = strtol(yytext,NULL,8); return INT_VAL;}
-{HEXADECIMAL}       {yylval.i_num = strtol(yytext,NULL,16); return INT_VAL;}
-{DECIMAL}			{yylval.i_num = strtol(yytext,NULL,10); return INT_VAL;}
-{FLOAT}				{yylval.f_num = atof(yytext); return FLOAT_VAL;}
-
 {OR}				{yylval.string = strdup(yytext); return OR;}
 {AND}				{yylval.string = strdup(yytext); return AND;}
 {BW_OR}				{yylval.string = strdup(yytext); return BW_OR;}
@@ -134,16 +112,40 @@ SPACE 				[ ]*
 {BW_NOT}			{yylval.string = strdup(yytext); return BW_NOT;}
 {INC}				{yylval.string = strdup(yytext); return INC;}
 {DEC}				{yylval.string = strdup(yytext); return DEC;}
+{SEMICOLON}			{return SEMICOLON;}
+{COMMA}				{return COMMA;}
+{LCURLY}			{return LCURLY;}
+{RCURLY}			{return RCURLY;}
+{EQUALS}			{yylval.string = strdup(yytext); return EQUALS;}
+{MUL_EQUALS} 		{yylval.string = strdup(yytext); return MUL_EQUALS;}
+{DIV_EQUALS}		{yylval.string = strdup(yytext); return DIV_EQUALS;} 
+{MOD_EQUALS}	   	{yylval.string = strdup(yytext); return MOD_EQUALS;}	 	
+{ADD_EQUALS}		{yylval.string = strdup(yytext); return ADD_EQUALS;}	
+{SUB_EQUALS}		{yylval.string = strdup(yytext); return SUB_EQUALS;}
+{LEFT_EQUALS}		{yylval.string = strdup(yytext); return LEFT_EQUALS;}
+{RIGHT_EQUALS}		{yylval.string = strdup(yytext); return RIGHT_EQUALS;} 
+{AND_EQUALS}		{yylval.string = strdup(yytext); return AND_EQUALS;}	
+{OR_EQUALS}			{yylval.string = strdup(yytext); return OR_EQUALS;}
+{XOR_EQUALS}		{yylval.string = strdup(yytext); return XOR_EQUALS;}
+{LBRAC}				{return LBRAC;}
+{RBRAC}				{return RBRAC;}
 
-{INT_KWD}			return INT;
-{IF_KWD}			return IF;
-{ELSE_KWD}			return ELSE;
-{WHILE_KWD}			return WHILE;
-{FOR_KWD}			return FOR;
-{GOTO}				return GOTO;
-{CONTINUE}			return CONTINUE;
-{BREAK}				return BREAK; 
-{RETURN}			return RETURN;
+{OCTAL}             {yylval.i_num = strtol(yytext,NULL,8); return INT_VAL;}
+{HEXADECIMAL}       {yylval.i_num = strtol(yytext,NULL,16); return INT_VAL;}
+{DECIMAL}			{yylval.i_num = strtol(yytext,NULL,10); return INT_VAL;}
+{FLOAT}				{yylval.f_num = atof(yytext); return FLOAT_VAL;}
+{CHAR}				{yylval.string = strdup(yytext); return CHAR;}
+{STRING}			{yylval.string = strdup(yytext); return STRING;}
+
+{INT_KWD}			{return INT;}
+{IF_KWD}			{return IF;}
+{ELSE_KWD}			{return ELSE;}
+{WHILE_KWD}			{return WHILE;}
+{FOR_KWD}			{return FOR;}
+{GOTO}				{return GOTO;}
+{CONTINUE}			{return CONTINUE;}
+{BREAK}				{return BREAK;}
+{RETURN}			{return RETURN;}
 
 {IDENTIFIER}		{yylval.string = strdup(yytext); return IDENTIFIER;}
 
