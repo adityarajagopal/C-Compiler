@@ -40,8 +40,8 @@ DO_KWD				do
 SWITCH_KWD			switch
 CASE_KWD			case
 DEFAULT_KWD			default
-GOTO 				goto
-CONTINUE			continue
+GOTO_KWD 			goto
+CONTINUE_KWD		continue
 BREAK 				break 
 RETURN 				return 
 SIZEOF				sizeof
@@ -145,29 +145,29 @@ SPACE 				[ ]*
 {CHAR}				{yylval.string = strdup(yytext); return CHAR;}
 {STRING}			{yylval.string = strdup(yytext); return STRING;}
 
-{INT_KWD}			{return INT;}
+{INT_KWD}			{return TYPE;}
 {IF_KWD}			{return IF;}
 {ELSE_KWD}			{return ELSE;}
 {WHILE_KWD}			{return WHILE;}
 {FOR_KWD}			{return FOR;}
-{GOTO}				{return GOTO;}
-{CONTINUE}			{return CONTINUE;}
 {BREAK}				{return BREAK;}
 {RETURN}			{return RETURN;}
 
+{GOTO_KWD}			{return GOTO_KWD;}
+{CONTINUE_KWD}		{return CONTINUE_KWD;}
 {ENUM_KWD}			{return ENUM;}
-{CHAR_KWD}			{return CHAR_KWD;}
-{FLOAT_KWD}			{return FLOAT_KWD;}
-{DOUBLE_KWD}		{return DOUBLE_KWD;}
-{SIGNED_KWD}		{return SIGNED;}
-{UNSIGNED_KWD}		{return UNSIGNED;}
-{SHORT_KWD}			{return SHORT;}
-{LONG_KWD}			{return LONG;}
+{CHAR_KWD}			{return TYPE;}
+{FLOAT_KWD}			{return TYPE;}
+{DOUBLE_KWD}		{return TYPE;}
+{SIGNED_KWD}		{return TYPE;}
+{UNSIGNED_KWD}		{return TYPE;}
+{SHORT_KWD}			{return TYPE;}
+{LONG_KWD}			{return TYPE;}
 {TYPEDEF_KWD}		{return TYPEDEF;}
 {STRUCT_KWD}		{return STRUCT;}
 {UNION_KWD}			{return UNION;}
-{VOID_KWD}			{return VOID;}
-{CONST_KWD}			{return CONST;}
+{VOID_KWD}			{return TYPE;}
+{CONST_KWD}			{return TYPE;}
 {VOLATILE_KWD}		{return VOLATILE;}
 {AUTO_KWD}			{return AUTO;}
 {EXTERN_KWD}		{return EXTERN;}
@@ -177,8 +177,6 @@ SPACE 				[ ]*
 {SWITCH_KWD}		{return SWITCH;}
 {CASE_KWD}			{return CASE;}
 {DEFAULT_KWD}		{return DEFAULT;}
-{GOTO}				{return GOTO;}
-{CONTINUE}			{return CONTINUE;}
 {SIZEOF}			{return SIZEOF;}
 
 {IDENTIFIER}		{yylval.string = strdup(yytext); return IDENTIFIER;}

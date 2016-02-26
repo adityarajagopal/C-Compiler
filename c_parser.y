@@ -64,10 +64,10 @@ node* make_node
 %token VOID STRUCT UNION CHAR TYPEDEF VOLATILE STRING
 %token IDENTIFIER INT_VAL FLOAT_VAL STRING_LIT
 %token IF ELSE FOR WHILE
-%token GOTO CONTINUE BREAK RETURN 
+%token GOTO_KWD CONTINUE_KWD BREAK RETURN 
 %token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS ADD SUB MULT DIV MOD
 %token QUESTION_MARK COLON OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT INC DEC BW_NOT NOT
-%token ENUM CHAR_KWD FLOAT_KWD DOUBLE_KWD AUTO EXTERN REGISTER STATIC DO SWITCH CASE SIZEOF DEFAULT
+%token ENUM CHAR_KWD FLOAT_KWD DOUBLE_KWD AUTO EXTERN REGISTER STATIC DO SWITCH CASE SIZEOF DEFAULT TYPE
 
 %type<tree_node> file external_decl decl decl_specifiers type_specifier init_list init_declarator declarator initial_val assign_expr expr unary_expr postfix_expr primary_expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement conditional_expr logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr jump_statement
 %type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT
@@ -104,7 +104,7 @@ decl_list		: decl
 				| decl decl_list {$1->next_decl = $2;}
 				;
 
-type_specifier	: INT {$$ = make_node("type_specifier", "int");}
+type_specifier	: TYPE {$$ = make_node("type_specifier", "int");}
 				;
 
 init_list		: init_declarator  
@@ -269,12 +269,12 @@ expr_statement 	: SEMICOLON {}
 				| expr SEMICOLON {}
 				;
 
-jump_statement	: GOTO IDENTIFIER SEMICOLON 
+jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON 
 				  {
 				  	$$ = make_node("jump", "goto"); 
 				   	$$->jump_next = make_node("primary_expr", $2);
 				  }
-				| CONTINUE SEMICOLON {$$ = make_node("jump", "continue");}
+				| CONTINUE_KWD SEMICOLON {$$ = make_node("jump", "continue");}
 				| BREAK SEMICOLON {$$ = make_node("jump", "break");}
 				| RETURN SEMICOLON 
 				  {
