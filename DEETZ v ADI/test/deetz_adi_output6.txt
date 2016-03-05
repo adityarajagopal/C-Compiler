@@ -1,0 +1,84 @@
+FUNCTION : whilling
+SCOPE
+    SCOPE
+FUNCTION : farting
+SCOPE
+    VARIABLE : i
+    SCOPE
+FUNCTION : nestwhiling
+SCOPE
+    SCOPE
+        VARIABLE : first
+        SCOPE
+            VARIABLE : second
+FUNCTION : nestfarting
+SCOPE
+    SCOPE
+        VARIABLE : first
+        SCOPE
+            VARIABLE : second
+FUNCTION : nestfarting2
+SCOPE
+    SCOPE
+        VARIABLE : first
+        SCOPE
+            VARIABLE : second
+FUNCTION : nestwhiling2
+SCOPE
+    SCOPE
+        VARIABLE : first
+        SCOPE
+            VARIABLE : second
+        SCOPE
+            VARIABLE : third
+            SCOPE
+                VARIABLE : fourth
+        SCOPE
+            VARIABLE : fifth
+        SCOPE
+            VARIABLE : sixth
+        SCOPE
+            VARIABLE : seventh
+        SCOPE
+            VARIABLE : eighth
+            SCOPE
+                VARIABLE : nineth
+        SCOPE
+            VARIABLE : tenth
+        SCOPE
+            VARIABLE : eleventh
+FUNCTION : longnesting
+SCOPE
+    SCOPE
+        VARIABLE : first
+        SCOPE
+            VARIABLE : second
+        SCOPE
+            VARIABLE : third
+            SCOPE
+                VARIABLE : fourth
+        SCOPE
+            VARIABLE : fifth
+            SCOPE
+                VARIABLE : fifthhalf
+                VARIABLE : sixth
+            SCOPE
+                VARIABLE : sixthhalf
+                VARIABLE : seventh
+            SCOPE
+                VARIABLE : seventhhalf
+                SCOPE
+                    VARIABLE : eighth
+                SCOPE
+                    VARIABLE : nineth
+            SCOPE
+                VARIABLE : tenth
+                SCOPE
+                    VARIABLE : eleventh
+                    SCOPE
+                        VARIABLE : twelth
+                        SCOPE
+                            VARIABLE : thirteenth
+        SCOPE
+            VARIABLE : fourteenth
+            VARIABLE : fifteenth

@@ -1,0 +1,25 @@
+FUNCTION : nestwhiling2
+SCOPE
+    SCOPE
+        VARIABLE : first
+        SCOPE
+            VARIABLE : second
+        SCOPE
+            VARIABLE : third
+            SCOPE
+                VARIABLE : fourth
+        SCOPE
+            VARIABLE : fifth
+        SCOPE
+            VARIABLE : sixth
+        SCOPE
+            VARIABLE : seventh
+        SCOPE
+            VARIABLE : eighth
+            SCOPE
+                VARIABLE : nineth
+        SCOPE
+            VARIABLE : tenth
+        SCOPE
+            VARIABLE : eleventh
+            VARIABLE : twelth

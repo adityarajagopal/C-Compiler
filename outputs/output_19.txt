@@ -1,0 +1,4 @@
+VARIABLE : x
+VARIABLE : y
+VARIABLE : j
+VARIABLE : f

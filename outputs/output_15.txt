@@ -1,0 +1,6 @@
+FUNCTION : while_test
+SCOPE
+FUNCTION : for_test
+SCOPE
+    VARIABLE : i
+    SCOPE

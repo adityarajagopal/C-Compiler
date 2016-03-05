@@ -1,0 +1,1 @@
+syntax error, unexpected MULT, expecting SEMICOLON or IDENTIFIER

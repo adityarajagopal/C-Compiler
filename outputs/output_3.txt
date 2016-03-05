@@ -1,0 +1,16 @@
+VARIABLE : a
+VARIABLE : b
+VARIABLE : d
+VARIABLE : f
+VARIABLE : c
+FUNCTION : test
+    PARAMETER : a
+    PARAMETER : b
+    PARAMETER : c
+SCOPE
+    VARIABLE : func_decl_test
+    VARIABLE : f
+    VARIABLE : t
+    VARIABLE : one
+    VARIABLE : two
+    VARIABLE : three

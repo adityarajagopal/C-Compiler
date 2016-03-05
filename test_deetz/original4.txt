@@ -1,0 +1,209 @@
+
+         FUNCTION: main
+PARAMETER:	e
+SCOPE
+VARIABLE:	ex
+VARIABLE:	ex1
+
+
+
+
+  VARIABLE:	y
+ 
+ VARIABLE:	x
+
+   
+
+FUNCTION: test
+PARAMETER:	a
+SCOPE
+
+
+   VARIABLE:	rdd
+
+ VARIABLE:	x
+
+        VARIABLE:	r
+VARIABLE:	x
+VARIABLE:	x
+VARIABLE:	d
+VARIABLE:	y
+VARIABLE:	ed
+
+ VARIABLE:	rs
+  VARIABLE:	x
+
+ VARIABLE:	x
+    VARIABLE:	y
+
+   VARIABLE:	r
+
+
+    
+ 
+	     
+	   
+FUNCTION: main2
+PARAMETER:	e2
+SCOPE
+VARIABLE:	ex2
+VARIABLE:	ex2_5
+VARIABLE:	ex3
+VARIABLE:	x
+
+
+ 
+
+	 
+	 
+	 
+	  
+	  
+FUNCTION: main3
+SCOPE
+VARIABLE:	x
+VARIABLE:	y
+VARIABLE:	z
+VARIABLE:	y
+VARIABLE:	z
+
+
+ 
+
+	   
+	
+		  
+		  
+	
+FUNCTION: whilling
+SCOPE
+SCOPE
+VARIABLE:	x
+VARIABLE:	x
+
+
+ 
+
+	 
+	       
+	
+		  
+	
+FUNCTION: foring
+SCOPE
+VARIABLE:	i
+SCOPE
+VARIABLE:	r
+
+
+ 
+
+	
+	
+		   
+		      
+FUNCTION: dowhiling
+SCOPE
+SCOPE
+VARIABLE:	ra
+VARIABLE:	y
+
+
+        
+
+	 
+	 
+		
+	   
+		  
+	
+		  
+
+	   
+		  
+	    
+	
+		  
+	
+	
+	
+		 
+		 
+	
+
+FUNCTION: ifing
+PARAMETER:	z
+PARAMETER:	a
+PARAMETER:	b
+SCOPE
+VARIABLE:	k
+VARIABLE:	bq
+VARIABLE:	Empty
+VARIABLE:	Empty
+
+
+ 
+
+
+	 
+	   
+	
+		 
+		   
+		
+			 
+		
+		
+		
+			 
+		
+	
+
+FUNCTION: main5
+SCOPE
+VARIABLE:	yas
+SCOPE
+VARIABLE:	Empty
+
+
+
+  
+
+	 
+	   
+	
+		 
+		   
+		
+			 
+		
+		
+		
+			 
+		
+	 
+	    
+	
+		 
+		   
+		
+			 
+		
+		    
+		
+			 
+		
+		
+		
+			 
+		
+	
+	
+	
+		 
+	
+FUNCTION: main4
+SCOPE
+VARIABLE:	ya
+VARIABLE:	Empty
+

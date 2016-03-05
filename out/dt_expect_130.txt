@@ -1,0 +1,3 @@
+FUNCTION : main
+SCOPE
+    VARIABLE : x

@@ -1,0 +1,4 @@
+FUNCTION : f
+SCOPE
+    VARIABLE : x
+    VARIABLE : u
