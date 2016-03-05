@@ -1,6 +1,0 @@
-FUNCTION : f
-SCOPE
-    VARIABLE : x
-    VARIABLE : u
-    VARIABLE : z
-    VARIABLE : y

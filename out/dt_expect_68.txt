@@ -1,5 +1,0 @@
-FUNCTION : ff
-SCOPE
-    VARIABLE : x
-    VARIABLE : u
-    VARIABLE : y

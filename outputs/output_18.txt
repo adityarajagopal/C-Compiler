@@ -1,9 +1,0 @@
-FUNCTION : for_nest
-SCOPE
-    VARIABLE : c
-    SCOPE
-        VARIABLE : j
-        SCOPE
-            VARIABLE : k
-        SCOPE
-            VARIABLE : m

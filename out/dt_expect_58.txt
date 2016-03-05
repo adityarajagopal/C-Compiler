@@ -1,2 +1,0 @@
-VARIABLE : y
-VARIABLE : z

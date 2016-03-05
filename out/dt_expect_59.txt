@@ -1,5 +1,0 @@
-VARIABLE : y
-VARIABLE : z
-VARIABLE : a
-VARIABLE : zzz
-VARIABLE : u
