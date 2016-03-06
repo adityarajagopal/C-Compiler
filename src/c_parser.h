@@ -8,6 +8,7 @@
 class Node;
 class File;
 class ExternalDecl;
+class FuncDef;
 class Decl;
 class DeclSpec;
 class TypeSpec;
@@ -17,10 +18,12 @@ class Declr;
 class Iden;
 class InitVal;
 class ParamList;
+class ParamDecl; 
 class AssExpr;
 class PrimExpr;
 class CondExpr;
 class UnaryExpr;
+class CompStat;
 
 class Node
 {
@@ -42,9 +45,21 @@ public:
 class ExternalDecl : public Node
 {
 private:
+	FuncDef* func_def;
 	Decl* decl;
 public:
-	ExternalDecl(Decl* _decl = NULL);
+	ExternalDecl(FuncDef* _func_def=NULL, Decl* _decl = NULL);
+	void print(); 
+};
+
+class FuncDef : public Node
+{
+private:
+	DeclSpec* decl_spec; 
+	Declr* declr; 
+	CompStat* comp_stat;
+public:
+	FuncDef(DeclSpec* _decl_spec=NULL, Declr* _declr=NULL, CompStat* _comp_stat=NULL); 
 	void print(); 
 };
 
@@ -117,6 +132,26 @@ public:
 	void print();
 };
 
+class ParamList : public Node
+{
+private:
+	ParamDecl* param_decl; 
+	ParamList* param_list; 
+public:
+	ParamList(ParamDecl* _param_decl=NULL, ParamList* _param_list=NULL);
+	void print(); 
+};
+
+class ParamDecl : public Node
+{
+private:
+	DeclSpec* decl_spec; 
+	Declr* declr; 
+public:
+	ParamDecl(DeclSpec* _decl_spec=NULL, Declr* _declr=NULL); 
+	void print(); 
+};
+
 class AssExpr : public Node
 {
 private:
@@ -144,6 +179,12 @@ private:
 	std::string value;
 public:
 	PrimExpr(std::string _value = ""); 
+	void print(); 
+};
+
+class CompStat : public Node
+{
+public:
 	void print(); 
 };
 

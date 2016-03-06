@@ -10,22 +10,43 @@ File* root = NULL;
 File::File(ExternalDecl* _external_decl, File* _file) : external_decl(_external_decl), file(_file) {}
 void File::print()
 {
-	if(external_decl != NULL)
-	{
-		external_decl->print();
-	}
 	if(file != NULL)
 	{
 		file->print(); 
 	}
+	if(external_decl != NULL)
+	{
+		external_decl->print();
+	}
 }
 
-ExternalDecl::ExternalDecl(Decl* _decl) : decl(_decl) {}
+ExternalDecl::ExternalDecl(FuncDef* _func_def, Decl* _decl) : func_def(_func_def), decl(_decl) {}
 void ExternalDecl::print()
 {
 	if(decl != NULL)
 	{
 		decl->print();
+	}
+	if(func_def != NULL)
+	{
+		func_def->print(); 
+	}
+}
+
+FuncDef::FuncDef(DeclSpec* _decl_spec, Declr* _declr, CompStat* _comp_stat) : decl_spec(_decl_spec), declr(_declr), comp_stat(_comp_stat) {}
+void FuncDef::print()
+{
+	if(decl_spec != NULL)
+	{
+		decl_spec->print(); 
+	}
+	if(declr != NULL)
+	{
+		declr->print(); 
+	}
+	if(comp_stat != NULL)
+	{
+		comp_stat->print(); 
 	}
 }
 
@@ -97,6 +118,16 @@ void Declr::print()
 	{
 		std::cout << id << " "; 
 	}
+	if(declr != NULL)
+	{
+		declr->print();
+	}
+	if(param_list != NULL)
+	{
+		std::cout << "(";
+		param_list->print(); 
+		std::cout << ")" << std::endl;
+	}
 }
 
 InitVal::InitVal(AssExpr* _ass_expr) : ass_expr(_ass_expr) {}
@@ -106,6 +137,33 @@ void InitVal::print()
 	{
 		ass_expr->print(); 
 	}
+}
+
+ParamList::ParamList(ParamDecl* _param_decl, ParamList* _param_list) : param_decl(_param_decl), param_list(_param_list) {}
+void ParamList::print()
+{
+	if(param_decl != NULL)
+	{
+		param_decl->print(); 
+	}
+	if(param_list != NULL)
+	{
+		param_list -> print(); 
+	}
+}
+
+ParamDecl::ParamDecl(DeclSpec* _decl_spec, Declr* _declr) : decl_spec(_decl_spec), declr(_declr) {}
+void ParamDecl::print() 
+{
+	if(decl_spec != NULL)
+	{
+		decl_spec->print(); 
+	}
+	if(declr != NULL)
+	{
+		declr->print(); 
+	}
+	std::cout << ", ";
 }
 
 AssExpr::AssExpr(CondExpr* _cond_expr, UnaryExpr* _unary_expr, std::string _ass_oper, AssExpr* _ass_expr) : cond_expr(_cond_expr), unary_expr(_unary_expr), ass_oper(_ass_oper), ass_expr(_ass_expr) {}
@@ -135,6 +193,11 @@ void PrimExpr::print()
 	}
 }
 
+void CompStat::print()
+{
+	std::cout << "{}" << std::endl;
+}
+
 %}
 
 %union 
@@ -145,6 +208,7 @@ void PrimExpr::print()
 	class Node* tree_node;
 	class File* File;
 	class ExternalDecl* Ext_Decl;
+	class FuncDef* Func_Def; 
 	class Decl* Decl;
 	class DeclSpec* Decl_Spec;
 	class TypeSpec* Type_Spec;
@@ -152,10 +216,13 @@ void PrimExpr::print()
 	class InitDeclr* Init_Declr;
 	class Declr* Declr;
 	class InitVal* Init_Val;
+	class ParamList* Param_List;
+	class ParamDecl* Param_Decl; 
 	class Iden* Iden;
 	class AssExpr* Ass_Expr;
 	class PrimExpr* Prim_Expr;
 	class CondExpr* Cond_Expr;
+	class CompStat* Comp_Stat;
 }
 
 %token SEMICOLON COMMA LCURLY RCURLY LBRAC RBRAC
@@ -168,11 +235,12 @@ void PrimExpr::print()
 %token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS ADD SUB MULT DIV MOD
 %token QUESTION_MARK COLON OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT INC DEC BW_NOT NOT
 %token ENUM CHAR_KWD FLOAT_KWD DOUBLE_KWD AUTO EXTERN REGISTER STATIC DO SWITCH CASE SIZEOF DEFAULT TYPE
-%type<tree_node> expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement jump_statement
+%type<tree_node> expr statement_list expr_statement decl_list selection_statement statement loop_statement jump_statement
 %type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT TYPE CHAR STRING INT_VAL FLOAT_VAL
 
 %type<File> file
 %type<Ext_Decl> external_decl
+%type<Func_Def> function_def
 %type<Decl> decl 
 %type<Decl_Spec> decl_specifiers
 %type<Type_Spec> type_specifier
@@ -180,8 +248,11 @@ void PrimExpr::print()
 %type<Init_Declr> init_declarator
 %type<Declr> declarator
 %type<Init_Val> initial_val
+%type<Param_List> param_list
+%type<Param_Decl> param_decl
 %type<Ass_Expr> assign_expr
 %type<Cond_Expr> conditional_expr
+%type<Comp_Stat> compound_statement 
 %type<Prim_Expr> primary_expr logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr unary_expr postfix_expr
 %% 
 
@@ -189,11 +260,11 @@ file			: external_decl {$$ = new File($1); root = $$;}
 	 			| file external_decl {$$ = new File($2, $1); root = $$;}
 				;
 
-external_decl	: function_def
-				| decl {$$ = new ExternalDecl($1);}
+external_decl	: function_def {$$ = new ExternalDecl($1);}
+				| decl {$$ = new ExternalDecl(NULL, $1);}
 				;
 
-function_def	: decl_specifiers declarator compound_statement 
+function_def	: decl_specifiers declarator compound_statement {$$ = new FuncDef($1,$2,$3);} 
 				;
 
 decl			: decl_specifiers SEMICOLON {$$ = new Decl($1);}
@@ -231,18 +302,18 @@ statement		: compound_statement
 				;
 
 declarator		: IDENTIFIER {$$ = new Declr($1);} 
-				| declarator LBRAC param_list RBRAC 
-				| declarator LBRAC RBRAC 
+				| declarator LBRAC param_list RBRAC {$$ = new Declr("", $1, $3);} 
+				| declarator LBRAC RBRAC {$$ = new Declr("", $1);}
 				;
 
-param_list		: param_decl
-				| param_decl COMMA param_list 
+param_list		: param_decl {$$ = new ParamList($1);}
+				| param_decl COMMA param_list {$$ = new ParamList($1, $3);}
 				;
 
-param_decl		: decl_specifiers declarator 
+param_decl		: decl_specifiers declarator {$$ = new ParamDecl($1,$2);} 
 				;
 
-compound_statement	: LCURLY RCURLY 
+compound_statement	: LCURLY RCURLY {$$ = new CompStat;} 
 					| LCURLY statement_list RCURLY 
 					| LCURLY decl_list RCURLY 
 					| LCURLY decl_list statement_list RCURLY 
