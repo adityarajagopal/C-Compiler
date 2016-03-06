@@ -46,7 +46,9 @@ void FuncDef::print()
 	}
 	if(comp_stat != NULL)
 	{
+		std::cout << "{" << std::endl;
 		comp_stat->print(); 
+		std::cout << "}" << std::endl;
 	}
 }
 
@@ -173,14 +175,26 @@ void AssExpr::print()
 	{
 		cond_expr->print(); 
 	}
+	if(unary_expr != NULL)
+	{
+		unary_expr->print();
+	}
+	if(ass_oper != "")
+	{
+		std::cout << ass_oper << " ";
+	}
+	if(ass_expr != NULL)
+	{
+		ass_expr->print();
+	}
 }
 
-CondExpr::CondExpr(PrimExpr* _prim_expr) : prim_expr(_prim_expr) {}
+CondExpr::CondExpr(Expression* _expression) : expression(_expression) {}
 void CondExpr::print()
 {
-	if(prim_expr != NULL)
+	if(expression != NULL)
 	{
-		prim_expr->print(); 
+		expression->print(); 
 	}
 }
 
@@ -193,9 +207,147 @@ void PrimExpr::print()
 	}
 }
 
+CompStat::CompStat(StatList* _stat_list, DeclList* _decl_list) : stat_list(_stat_list), decl_list(_decl_list) {}
 void CompStat::print()
 {
-	std::cout << "{}" << std::endl;
+	if(decl_list != NULL)
+	{
+		decl_list->print();
+	}
+	if(stat_list != NULL)
+	{
+		stat_list->print(); 
+	}
+}
+
+DeclList::DeclList(Decl* _decl, DeclList* _decl_list) : decl(_decl), decl_list(_decl_list) {}
+void DeclList::print()
+{
+	if(decl != NULL)
+	{
+		decl->print();
+	}
+	if(decl_list != NULL)
+	{
+		decl_list->print(); 
+	}
+}
+
+StatList::StatList(Stat* _stat, StatList* _stat_list) : stat(_stat), stat_list(_stat_list) {}
+void StatList::print()
+{
+	if(stat != NULL)
+	{
+		stat->print(); 
+	}
+	if(stat_list != NULL)
+	{
+		stat_list->print(); 
+	}
+}
+
+Stat::Stat(CompStat* _comp_stat, ExprStat* _expr_stat, SelecStat* _selec_stat, LoopStat* _loop_stat, JumpStat* _jump_stat) : comp_stat(_comp_stat), expr_stat(_expr_stat), selec_stat(_selec_stat), loop_stat(_loop_stat), jump_stat(_jump_stat) {}
+void Stat::print()
+{
+	if(comp_stat != NULL)
+	{
+		comp_stat->print(); 
+	}
+	if(expr_stat != NULL)
+	{
+		expr_stat->print(); 
+	}/*
+	if(selec_stat != NULL)
+	{
+		selec_stat->print(); 
+	}
+	if(loop_stat != NULL)
+	{
+		loop_stat->print(); 
+	}
+	if(jump_stat != NULL)
+	{
+		jump_stat->print(); 
+	}*/
+}
+
+ExprStat::ExprStat(Expr* _expr) : expr(_expr) {}
+void ExprStat::print()
+{
+	if(expr != NULL)
+	{
+		expr->print();
+	}
+}
+
+Expression::Expression(Expression* _lhs, Expression* _rhs, std::string _op, UnaryExpr* _unary_expr) : lhs(_lhs), rhs(_rhs), op(_op), unary_expr(_unary_expr) {}
+void Expression::print()
+{
+	if(op != "")
+	{
+		std::cout << op << " "; 
+	}
+	if(lhs != NULL)
+	{
+		lhs->print(); 
+	}
+	if(unary_expr != NULL)
+	{
+		unary_expr->print();
+	}
+	if(rhs != NULL)
+	{
+		rhs->print(); 
+	}
+}
+
+UnaryExpr::UnaryExpr(PostFixExpr* _post_fix_expr, UnaryExpr* _unary_expr, std::string _unary_op) : post_fix_expr(_post_fix_expr), unary_expr(_unary_expr), unary_op(_unary_op) {}
+void UnaryExpr::print()
+{
+	if(post_fix_expr != NULL)
+	{
+		post_fix_expr->print();
+	}
+
+	if(unary_op != "")
+	{
+		std::cout << unary_op << " ";
+	}
+
+	if(unary_expr != NULL)
+	{
+		unary_expr->print(); 
+	}
+}
+
+PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op) {}
+void PostFixExpr::print()
+{
+	if(prim_expr != NULL)
+	{
+		prim_expr->print(); 
+	}
+	if(post_fix_expr != NULL)
+	{
+		post_fix_expr->print(); 
+	}
+	if(op != "")
+	{
+		std::cout << op << " ";
+	}
+}
+
+Expr::Expr(AssExpr* _ass_expr, Expr* _expr) : ass_expr(_ass_expr), expr(_expr) {}
+void Expr::print() 
+{
+	if(ass_expr != NULL)
+	{
+		ass_expr->print(); 
+	}
+	if(expr != NULL)
+	{
+		expr->print(); 
+	}
 }
 
 %}
@@ -219,10 +371,18 @@ void CompStat::print()
 	class ParamList* Param_List;
 	class ParamDecl* Param_Decl; 
 	class Iden* Iden;
+	class Expr* _Expr;
 	class AssExpr* Ass_Expr;
 	class PrimExpr* Prim_Expr;
 	class CondExpr* Cond_Expr;
 	class CompStat* Comp_Stat;
+	class DeclList* Decl_List;
+	class StatList* Stat_List;
+	class Stat* Stat;
+	class ExprStat* Expr_Stat;
+	class Expression* Express;
+	class UnaryExpr* Unary_Expr;
+	class PostFixExpr* Postfix_Expr;
 }
 
 %token SEMICOLON COMMA LCURLY RCURLY LBRAC RBRAC
@@ -235,7 +395,7 @@ void CompStat::print()
 %token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS ADD SUB MULT DIV MOD
 %token QUESTION_MARK COLON OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT INC DEC BW_NOT NOT
 %token ENUM CHAR_KWD FLOAT_KWD DOUBLE_KWD AUTO EXTERN REGISTER STATIC DO SWITCH CASE SIZEOF DEFAULT TYPE
-%type<tree_node> expr statement_list expr_statement decl_list selection_statement statement loop_statement jump_statement
+%type<tree_node> selection_statement loop_statement jump_statement do_statement
 %type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT TYPE CHAR STRING INT_VAL FLOAT_VAL
 
 %type<File> file
@@ -251,9 +411,17 @@ void CompStat::print()
 %type<Param_List> param_list
 %type<Param_Decl> param_decl
 %type<Ass_Expr> assign_expr
+%type<_Expr> expr
 %type<Cond_Expr> conditional_expr
-%type<Comp_Stat> compound_statement 
-%type<Prim_Expr> primary_expr logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr unary_expr postfix_expr
+%type<Comp_Stat> compound_statement
+%type<Decl_List> decl_list
+%type<Stat_List> statement_list
+%type<Stat> statement
+%type<Expr_Stat> expr_statement
+%type<Express> logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr 
+%type<Unary_Expr> unary_expr
+%type<Postfix_Expr> postfix_expr
+%type<Prim_Expr> primary_expr
 %% 
 
 file			: external_decl {$$ = new File($1); root = $$;} 
@@ -275,8 +443,8 @@ decl_specifiers	: type_specifier {$$ = new DeclSpec($1);}
 				| type_specifier decl_specifiers {$$ = new DeclSpec($1, $2);} 
 				;
 
-decl_list		: decl
-				| decl decl_list
+decl_list		: decl {$$ = new DeclList($1);}
+				| decl decl_list {$$ = new DeclList($1,$2);}
 				;
 
 type_specifier	: TYPE {$$ = new TypeSpec($1);}
@@ -290,15 +458,15 @@ init_declarator	: declarator {$$ = new InitDeclr($1);}
 				| declarator EQUALS initial_val {$$ = new InitDeclr($1, $3);}
 				;
 
-statement_list	: statement
-				| statement statement_list 
-				;
+statement_list	: statement {$$ = new StatList($1);}
+				| statement statement_list {$$ = new StatList($1,$2);}
+				
 
-statement		: compound_statement 
-				| expr_statement
-				| selection_statement
-				| loop_statement
-				| jump_statement
+statement		: compound_statement {$$ = new Stat($1);} 
+				| expr_statement {$$ = new Stat(NULL,$1);}
+				| selection_statement {$$ = new Stat();}
+				| loop_statement {$$ = new Stat();}
+				| jump_statement {$$ = new Stat();}
 				;
 
 declarator		: IDENTIFIER {$$ = new Declr($1);} 
@@ -313,10 +481,10 @@ param_list		: param_decl {$$ = new ParamList($1);}
 param_decl		: decl_specifiers declarator {$$ = new ParamDecl($1,$2);} 
 				;
 
-compound_statement	: LCURLY RCURLY {$$ = new CompStat;} 
-					| LCURLY statement_list RCURLY 
-					| LCURLY decl_list RCURLY 
-					| LCURLY decl_list statement_list RCURLY 
+compound_statement	: LCURLY RCURLY {$$ = new CompStat();} 
+					| LCURLY statement_list RCURLY {$$ = new CompStat($2);} 
+					| LCURLY decl_list RCURLY {$$ = new CompStat(NULL,$2);} 
+					| LCURLY decl_list statement_list RCURLY {$$ = new CompStat($3,$2);}
 					;
 
 initial_val		: assign_expr {$$ = new InitVal($1);}
@@ -327,12 +495,16 @@ selection_statement : IF LBRAC expr RBRAC statement
 					;
 
 loop_statement	: WHILE LBRAC expr RBRAC statement
+				| do_statement
 				| FOR LBRAC expr_statement expr_statement RBRAC statement 
 				| FOR LBRAC expr_statement expr_statement expr RBRAC statement 
 				;
 
-expr_statement 	: SEMICOLON {}
-				| expr SEMICOLON {}
+do_statement 	: DO statement WHILE LBRAC expr RBRAC SEMICOLON 
+				;
+
+expr_statement 	: SEMICOLON {$$ = new ExprStat();}
+				| expr SEMICOLON {$$ = new ExprStat($1);}
 				;
 
 jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON 
@@ -340,12 +512,12 @@ jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON
 				| RETURN expr SEMICOLON 
 				;
 
-expr			: assign_expr 
-				| expr COMMA assign_expr {}
+expr			: assign_expr {$$ = new Expr($1);}  
+				| expr COMMA assign_expr {$$ = new Expr($3,$1);}
 				;
 
 assign_expr		: conditional_expr {$$ = new AssExpr($1);}
-				| unary_expr assign_oper assign_expr 
+				| unary_expr assign_oper assign_expr {$$ = new AssExpr(NULL,$1,$2,$3);}  
 				;
 
 assign_oper		: EQUALS {}
@@ -365,58 +537,58 @@ conditional_expr : logical_or_expr {$$ = new CondExpr($1);}
 			     | logical_or_expr QUESTION_MARK expr COLON conditional_expr
 				 ;
 
-logical_or_expr : logical_and_expr
-				| logical_or_expr OR logical_and_expr
+logical_or_expr : logical_and_expr {$$ = new Expression($1);}
+				| logical_or_expr OR logical_and_expr {$$ = new Expression($1,$3,"||");}
 				;
 
-logical_and_expr : incl_or_expr
-				 | logical_and_expr AND incl_or_expr
+logical_and_expr : incl_or_expr {$$ = new Expression($1);}
+				 | logical_and_expr AND incl_or_expr{$$ = new Expression($1,$3,"&&");}
 				 ;
 
-incl_or_expr 	: excl_or_expr
-				| incl_or_expr BW_OR excl_or_expr
+incl_or_expr 	: excl_or_expr{$$ = new Expression($1);}
+				| incl_or_expr BW_OR excl_or_expr{$$ = new Expression($1,$3,"|");}
 				;
 
-excl_or_expr	: and_expr
-				| excl_or_expr BW_XOR and_expr
+excl_or_expr	: and_expr{$$ = new Expression($1);}
+				| excl_or_expr BW_XOR and_expr{$$ = new Expression($1,$3,"^");}
 				;
 
-and_expr		: bool_equal_expr
-				| and_expr BW_AND bool_equal_expr
+and_expr		: bool_equal_expr{$$ = new Expression($1);}
+				| and_expr BW_AND bool_equal_expr{$$ = new Expression($1,$3,"&");}
 				;
 
-bool_equal_expr : comparison_expr
-				| bool_equal_expr EQUAL_EQUAL comparison_expr
-				| bool_equal_expr NOT_EQUAL comparison_expr
+bool_equal_expr : comparison_expr{$$ = new Expression($1);}
+				| bool_equal_expr EQUAL_EQUAL comparison_expr{$$ = new Expression($1,$3,"==");}
+				| bool_equal_expr NOT_EQUAL comparison_expr{$$ = new Expression($1,$3,"!=");}
 				;
 
-comparison_expr : shift_expr
-				| comparison_expr LT shift_expr
-				| comparison_expr GT shift_expr
-				| comparison_expr LE shift_expr
-				| comparison_expr GE shift_expr
+comparison_expr : shift_expr{$$ = new Expression($1);}
+				| comparison_expr LT shift_expr{$$ = new Expression($1,$3,"<");}
+				| comparison_expr GT shift_expr{$$ = new Expression($1,$3,">");}
+				| comparison_expr LE shift_expr{$$ = new Expression($1,$3,"<=");}
+				| comparison_expr GE shift_expr{$$ = new Expression($1,$3,">=");}
 				;
 
-shift_expr 		: addsub_expr
-				| shift_expr LEFT_SHIFT addsub_expr
-				| shift_expr RIGHT_SHIFT addsub_expr
+shift_expr 		: addsub_expr{$$ = new Expression($1);}
+				| shift_expr LEFT_SHIFT addsub_expr{$$ = new Expression($1,$3,"<<");}
+				| shift_expr RIGHT_SHIFT addsub_expr{$$ = new Expression($1,$3,">>");}
 				;
 
-addsub_expr		: multdivmod_expr
-				| addsub_expr ADD multdivmod_expr
-				| addsub_expr SUB multdivmod_expr
+addsub_expr		: multdivmod_expr {$$ = new Expression($1);}
+				| addsub_expr ADD multdivmod_expr{$$ = new Expression($1,$3,"+");}
+				| addsub_expr SUB multdivmod_expr{$$ = new Expression($1,$3,"-");}
 				;
 
-multdivmod_expr : unary_expr
-				| multdivmod_expr MULT unary_expr
-				| multdivmod_expr DIV unary_expr
-				| multdivmod_expr MOD unary_expr
+multdivmod_expr : unary_expr {$$ = new Expression(NULL,NULL,"",$1);}
+				| multdivmod_expr MULT unary_expr{$$ = new Expression($1,NULL,"*",$3);}
+				| multdivmod_expr DIV unary_expr{$$ = new Expression($1,NULL,"/",$3);}
+				| multdivmod_expr MOD unary_expr{$$ = new Expression($1,NULL,"%",$3);}
 				;
 
-unary_expr		: postfix_expr
-				| INC unary_expr 
-				| DEC unary_expr 
-				| unary_oper unary_expr 
+unary_expr		: postfix_expr {$$ = new UnaryExpr($1);}
+				| INC unary_expr {$$ = new UnaryExpr(NULL,$2,$1);}
+				| DEC unary_expr {$$ = new UnaryExpr(NULL,$2,$1);}
+				| unary_oper unary_expr {$$ = new UnaryExpr(NULL,$2,$1);} 
 				;
 
 unary_oper		: BW_AND
@@ -427,9 +599,9 @@ unary_oper		: BW_AND
 				| NOT
 				;
 
-postfix_expr	: primary_expr 
-				| postfix_expr INC
-				| postfix_expr DEC
+postfix_expr	: primary_expr {$$ = new PostFixExpr($1);} 
+				| postfix_expr INC {$$ = new PostFixExpr(NULL, $1, $2);}
+				| postfix_expr DEC {$$ = new PostFixExpr(NULL, $1, $2);}
 				;
 
 primary_expr	: IDENTIFIER {$$ = new PrimExpr($1);} 

@@ -20,10 +20,21 @@ class InitVal;
 class ParamList;
 class ParamDecl; 
 class AssExpr;
+class Expr;
 class PrimExpr;
 class CondExpr;
 class UnaryExpr;
 class CompStat;
+class DeclList;
+class StatList; 
+class Stat;
+class ExprStat; 
+class LoopStat; 
+class SelecStat; 
+class JumpStat;
+class Expression;
+class PostFixExpr;
+class LoopStat;
 
 class Node
 {
@@ -167,9 +178,9 @@ public:
 class CondExpr : public Node
 {
 private:
-	PrimExpr* prim_expr; 
+	Expression* expression; 
 public:
-	CondExpr(PrimExpr* _prim_expr = NULL);
+	CondExpr(Expression* _expression = NULL);
 	void print(); 
 };
 
@@ -184,7 +195,109 @@ public:
 
 class CompStat : public Node
 {
+private:
+	StatList* stat_list; 
+	DeclList* decl_list;
 public:
+	CompStat(StatList* _stat_list=NULL, DeclList* _decl_list=NULL);
+	void print(); 
+};
+
+class DeclList : public Node
+{
+private:
+	Decl* decl; 
+	DeclList* decl_list; 
+public: 
+	DeclList(Decl* _decl=NULL, DeclList* _decl_list=NULL); 
+	void print(); 
+};
+
+class StatList : public Node
+{
+private:
+	Stat* stat;
+	StatList* stat_list; 
+public:
+	StatList(Stat* _stat=NULL, StatList* _stat_list=NULL);
+	void print();
+};
+
+class Stat : public Node
+{
+private:
+	CompStat* comp_stat; 
+	ExprStat* expr_stat; 
+	SelecStat* selec_stat; 
+	LoopStat* loop_stat; 
+	JumpStat* jump_stat; 
+public: 
+	Stat(CompStat* _comp_stat=NULL, ExprStat* _expr_stat=NULL, SelecStat* _selec_stat=NULL, LoopStat* _loop_stat=NULL, JumpStat* _jump_stat=NULL);
+	void print(); 
+};
+
+class ExprStat : public Node
+{
+private:
+	Expr* expr;
+public:
+	ExprStat(Expr* _expr=NULL);
+	void print(); 
+};
+
+class Expr : public Node
+{
+private:
+	AssExpr* ass_expr;
+	Expr* expr;
+public:
+	Expr(AssExpr* _ass_exp=NULL, Expr* _expr=NULL);
+	void print(); 
+};
+
+class Expression : public Node
+{
+private:
+	Expression* lhs; 
+	Expression* rhs; 
+	std::string op;
+	UnaryExpr* unary_expr; 
+public: 
+	Expression(Expression* _lhs=NULL, Expression* rhs=NULL, std::string _op="", UnaryExpr* _unary_expr=NULL);
+	void print(); 
+};
+
+class UnaryExpr : public Node
+{
+private:
+	PostFixExpr* post_fix_expr;
+	UnaryExpr* unary_expr;
+	std::string unary_op;
+public:
+	UnaryExpr(PostFixExpr* _post_fix_expr=NULL, UnaryExpr* _unary_expr=NULL, std::string _unary_op="");
+	void print(); 
+};
+
+class PostFixExpr : public Node
+{
+private:
+	PrimExpr* prim_expr; 
+	PostFixExpr* post_fix_expr; 
+	std::string op;
+public:
+	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="");
+	void print();
+};
+
+class LoopStat : public Node
+{
+private:
+	ExprStat* expr_stat_1; 
+	ExprStat* expr_stat_2; 
+	Expr* expr; 
+	Stat* stat;
+public: 
+	LoopStat(ExprStat* _es1, ExprStat* _es2, Expr* _e, Stat* _s);
 	void print(); 
 };
 
