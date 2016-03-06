@@ -5,7 +5,8 @@
 #include <string> 
 #include <sstream> 
 
-class Node; 
+class Node;
+class File;
 class ExternalDecl;
 class Decl;
 class DeclSpec;
@@ -26,6 +27,16 @@ class Node
 public:
 	virtual void print() =0; 
 	virtual ~Node() {}
+};
+
+class File : public Node
+{
+private: 
+	ExternalDecl* external_decl; 
+	File* file;
+public:
+	File(ExternalDecl* _external_decl=NULL, File* _file=NULL);
+	void print(); 
 };
 
 class ExternalDecl : public Node

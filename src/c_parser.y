@@ -5,7 +5,20 @@
 int yylex();
 int yyerror(const char* s);
 
-ExternalDecl* root = NULL;
+File* root = NULL;
+
+File::File(ExternalDecl* _external_decl, File* _file) : external_decl(_external_decl), file(_file) {}
+void File::print()
+{
+	if(external_decl != NULL)
+	{
+		external_decl->print();
+	}
+	if(file != NULL)
+	{
+		file->print(); 
+	}
+}
 
 ExternalDecl::ExternalDecl(Decl* _decl) : decl(_decl) {}
 void ExternalDecl::print()
@@ -130,6 +143,7 @@ void PrimExpr::print()
 	int i_num; 
 	float f_num;
 	class Node* tree_node;
+	class File* File;
 	class ExternalDecl* Ext_Decl;
 	class Decl* Decl;
 	class DeclSpec* Decl_Spec;
@@ -154,9 +168,10 @@ void PrimExpr::print()
 %token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS ADD SUB MULT DIV MOD
 %token QUESTION_MARK COLON OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT INC DEC BW_NOT NOT
 %token ENUM CHAR_KWD FLOAT_KWD DOUBLE_KWD AUTO EXTERN REGISTER STATIC DO SWITCH CASE SIZEOF DEFAULT TYPE
-%type<tree_node> file expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement jump_statement
+%type<tree_node> expr function_def compound_statement statement_list expr_statement param_list param_decl decl_list selection_statement statement loop_statement jump_statement
 %type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT TYPE CHAR STRING INT_VAL FLOAT_VAL
 
+%type<File> file
 %type<Ext_Decl> external_decl
 %type<Decl> decl 
 %type<Decl_Spec> decl_specifiers
@@ -170,12 +185,12 @@ void PrimExpr::print()
 %type<Prim_Expr> primary_expr logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr unary_expr postfix_expr
 %% 
 
-file			: external_decl 
-	 			| file external_decl 
+file			: external_decl {$$ = new File($1); root = $$;} 
+	 			| file external_decl {$$ = new File($2, $1); root = $$;}
 				;
 
 external_decl	: function_def
-				| decl {$$ = new ExternalDecl($1); root = $$;}
+				| decl {$$ = new ExternalDecl($1);}
 				;
 
 function_def	: decl_specifiers declarator compound_statement 
