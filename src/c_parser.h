@@ -34,7 +34,8 @@ class SelecStat;
 class JumpStat;
 class Expression;
 class PostFixExpr;
-class LoopStat;
+class DoStat;
+class IfElseExpr;
 
 class Node
 {
@@ -178,9 +179,21 @@ public:
 class CondExpr : public Node
 {
 private:
-	Expression* expression; 
+	Expression* expression;
+	IfElseExpr* ie_expr;
 public:
-	CondExpr(Expression* _expression = NULL);
+	CondExpr(Expression* _expression = NULL, IfElseExpr* _ie_expr=NULL);
+	void print(); 
+};
+
+class IfElseExpr : public Node
+{
+private:
+	Expression* if_cond; 
+	Expr* if_expr; 
+	CondExpr* else_expr;
+public: 
+	IfElseExpr(Expression* _ic=NULL, Expr* _ie=NULL, CondExpr* _ee=NULL); 
 	void print(); 
 };
 
@@ -188,8 +201,9 @@ class PrimExpr : public Node
 {
 private:
 	std::string value;
+	Expr* expr;
 public:
-	PrimExpr(std::string _value = ""); 
+	PrimExpr(std::string _value = "", Expr* _e=NULL); 
 	void print(); 
 };
 
@@ -296,8 +310,30 @@ private:
 	ExprStat* expr_stat_2; 
 	Expr* expr; 
 	Stat* stat;
+	DoStat* do_stat;
 public: 
-	LoopStat(ExprStat* _es1, ExprStat* _es2, Expr* _e, Stat* _s);
+	LoopStat(ExprStat* _es1=NULL, ExprStat* _es2=NULL, Expr* _e=NULL, Stat* _s=NULL, DoStat* _ds=NULL);
+	void print(); 
+};
+
+class DoStat : public Node
+{
+private:
+	Stat* stat; 
+	Expr* expr; 
+public:
+	DoStat(Stat* _stat=NULL, Expr* _expr=NULL);
+	void print(); 
+};
+
+class SelecStat : public Node
+{
+private:
+	Expr* expr; 
+	Stat* stat_if; 
+	Stat* stat_else;
+public:
+	SelecStat(Expr* _e=NULL, Stat* _si=NULL, Stat* _se=NULL); 
 	void print(); 
 };
 

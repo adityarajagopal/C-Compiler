@@ -189,21 +189,29 @@ void AssExpr::print()
 	}
 }
 
-CondExpr::CondExpr(Expression* _expression) : expression(_expression) {}
+CondExpr::CondExpr(Expression* _expression, IfElseExpr* _ie_expr) : expression(_expression), ie_expr(_ie_expr) {}
 void CondExpr::print()
 {
 	if(expression != NULL)
 	{
 		expression->print(); 
 	}
+	if(ie_expr != NULL)
+	{
+		ie_expr->print(); 
+	}
 }
 
-PrimExpr::PrimExpr(std::string _value) : value(_value) {}
+PrimExpr::PrimExpr(std::string _value, Expr* _e) : value(_value), expr(_e) {}
 void PrimExpr::print()
 {
 	if(value != "")
 	{
 		std::cout << value << " ";
+	}
+	if(expr != NULL)
+	{
+		expr->print(); 
 	}
 }
 
@@ -256,7 +264,7 @@ void Stat::print()
 	if(expr_stat != NULL)
 	{
 		expr_stat->print(); 
-	}/*
+	}
 	if(selec_stat != NULL)
 	{
 		selec_stat->print(); 
@@ -264,7 +272,7 @@ void Stat::print()
 	if(loop_stat != NULL)
 	{
 		loop_stat->print(); 
-	}
+	}/*
 	if(jump_stat != NULL)
 	{
 		jump_stat->print(); 
@@ -342,11 +350,93 @@ void Expr::print()
 {
 	if(ass_expr != NULL)
 	{
-		ass_expr->print(); 
+		ass_expr->print();
+		std::cout << std::endl;
 	}
 	if(expr != NULL)
 	{
 		expr->print(); 
+	}
+}
+
+LoopStat::LoopStat(ExprStat* _es1, ExprStat* _es2, Expr* _e, Stat* _s, DoStat* _ds) : expr_stat_1(_es1), expr_stat_2(_es2), expr(_e), stat(_s), do_stat(_ds) {}
+void LoopStat::print()
+{
+	if(expr_stat_1 != NULL)
+	{
+		std::cout << "for:" << std::endl;
+		expr_stat_1->print(); 
+	}
+	if(expr_stat_2 != NULL)
+	{
+		expr_stat_2->print(); 
+	}
+	if(expr != NULL)
+	{
+		if(expr_stat_1 == NULL)
+			std::cout << "while:" << std::endl;
+		expr->print(); 
+		std::cout << std::endl;
+	}
+	if(stat != NULL)
+	{
+		std::cout << "body:" << std::endl;
+		stat->print(); 
+	}
+}
+
+DoStat::DoStat(Stat* _stat, Expr* _expr) : stat(_stat), expr(_expr) {}
+void DoStat::print() 
+{
+	if(stat != NULL)
+	{
+		std::cout << "do:" << std::endl; 
+		stat->print(); 
+	}
+	if(expr != NULL)
+	{
+		std::cout << "while:" << std::endl;
+		expr->print(); 
+	}
+}
+
+SelecStat::SelecStat(Expr* _e, Stat* _si, Stat* _se) : expr(_e), stat_if(_si), stat_else(_se) {}
+void SelecStat::print() 
+{
+	if(expr != NULL)
+	{
+		std::cout << "if: ";
+		expr->print(); 
+	}
+	if(stat_if != NULL)
+	{
+		std::cout << "body:" << std::endl; 
+		stat_if->print(); 
+	}
+	if(stat_else != NULL)
+	{
+		std::cout << "else:" << std::endl;
+		stat_else->print(); 
+	}
+}
+
+IfElseExpr::IfElseExpr(Expression* _ic, Expr* _ie, CondExpr* _ee) : if_cond(_ic), if_expr(_ie), else_expr(_ee) {}
+void IfElseExpr::print()
+{
+	if(if_cond != NULL)
+	{
+		std::cout << "if: ";
+		if_cond->print(); 
+	}
+	if(if_expr != NULL)
+	{
+		std::cout << "body: "; 
+		if_expr->print(); 
+	}
+	if(else_expr != NULL)
+	{
+		std::cout << "else: ";
+		else_expr->print();
 	}
 }
 
@@ -383,6 +473,10 @@ void Expr::print()
 	class Expression* Express;
 	class UnaryExpr* Unary_Expr;
 	class PostFixExpr* Postfix_Expr;
+	class LoopStat* Loop_Stat;
+	class DoStat* Do_Stat;
+	class SelecStat* Selec_Stat;
+	class IfElseExpr* IE_Expr;
 }
 
 %token SEMICOLON COMMA LCURLY RCURLY LBRAC RBRAC
@@ -395,7 +489,7 @@ void Expr::print()
 %token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS ADD SUB MULT DIV MOD
 %token QUESTION_MARK COLON OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT INC DEC BW_NOT NOT
 %token ENUM CHAR_KWD FLOAT_KWD DOUBLE_KWD AUTO EXTERN REGISTER STATIC DO SWITCH CASE SIZEOF DEFAULT TYPE
-%type<tree_node> selection_statement loop_statement jump_statement do_statement
+%type<tree_node> jump_statement 
 %type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT TYPE CHAR STRING INT_VAL FLOAT_VAL
 
 %type<File> file
@@ -414,6 +508,9 @@ void Expr::print()
 %type<_Expr> expr
 %type<Cond_Expr> conditional_expr
 %type<Comp_Stat> compound_statement
+%type<Loop_Stat> loop_statement
+%type<Do_Stat> do_statement
+%type<Selec_Stat> selection_statement
 %type<Decl_List> decl_list
 %type<Stat_List> statement_list
 %type<Stat> statement
@@ -422,6 +519,8 @@ void Expr::print()
 %type<Unary_Expr> unary_expr
 %type<Postfix_Expr> postfix_expr
 %type<Prim_Expr> primary_expr
+%type<IE_Expr> ie_expr
+
 %% 
 
 file			: external_decl {$$ = new File($1); root = $$;} 
@@ -464,8 +563,8 @@ statement_list	: statement {$$ = new StatList($1);}
 
 statement		: compound_statement {$$ = new Stat($1);} 
 				| expr_statement {$$ = new Stat(NULL,$1);}
-				| selection_statement {$$ = new Stat();}
-				| loop_statement {$$ = new Stat();}
+				| selection_statement {$$ = new Stat(NULL,NULL,$1);}
+				| loop_statement {$$ = new Stat(NULL,NULL,NULL,$1,NULL);}
 				| jump_statement {$$ = new Stat();}
 				;
 
@@ -490,17 +589,17 @@ compound_statement	: LCURLY RCURLY {$$ = new CompStat();}
 initial_val		: assign_expr {$$ = new InitVal($1);}
 				;
 
-selection_statement : IF LBRAC expr RBRAC statement 
-					| IF LBRAC expr RBRAC statement ELSE statement 
+selection_statement : IF LBRAC expr RBRAC statement {$$ = new SelecStat($3,$5);} 
+					| IF LBRAC expr RBRAC statement ELSE statement {$$ = new SelecStat($3,$5,$7);}
 					;
 
-loop_statement	: WHILE LBRAC expr RBRAC statement
-				| do_statement
-				| FOR LBRAC expr_statement expr_statement RBRAC statement 
-				| FOR LBRAC expr_statement expr_statement expr RBRAC statement 
+loop_statement	: WHILE LBRAC expr RBRAC statement {$$ = new LoopStat(NULL,NULL,$3,$5);}
+				| do_statement {$$ = new LoopStat(NULL,NULL,NULL,NULL,$1);}
+				| FOR LBRAC expr_statement expr_statement RBRAC statement {$$ = new LoopStat($3,$4,NULL,$6);}
+				| FOR LBRAC expr_statement expr_statement expr RBRAC statement {$$ = new LoopStat($3,$4,$5,$7);}
 				;
 
-do_statement 	: DO statement WHILE LBRAC expr RBRAC SEMICOLON 
+do_statement 	: DO statement WHILE LBRAC expr RBRAC SEMICOLON {$$ = new DoStat($2,$5);} 
 				;
 
 expr_statement 	: SEMICOLON {$$ = new ExprStat();}
@@ -534,7 +633,10 @@ assign_oper		: EQUALS {}
 				;
 
 conditional_expr : logical_or_expr {$$ = new CondExpr($1);}
-			     | logical_or_expr QUESTION_MARK expr COLON conditional_expr
+			     | ie_expr {$$ = new CondExpr(NULL, $1);}
+				 ;
+
+ie_expr			 : logical_or_expr QUESTION_MARK expr COLON conditional_expr {$$ = new IfElseExpr($1,$3,$5);}
 				 ;
 
 logical_or_expr : logical_and_expr {$$ = new Expression($1);}
@@ -609,7 +711,7 @@ primary_expr	: IDENTIFIER {$$ = new PrimExpr($1);}
 				| FLOAT_VAL {$$ = new PrimExpr($1);}  
 				| CHAR {$$ = new PrimExpr($1);}  
 				| STRING {$$ = new PrimExpr($1);}  
-				| LBRAC expr RBRAC {}
+				| LBRAC expr RBRAC {$$ = new PrimExpr("",$2);}
 				;
 %%
 
