@@ -2,8 +2,10 @@
 #define C_PARSER_H
 
 #include <iostream> 
-#include <string> 
-#include <sstream> 
+#include <string>
+#include <fstream> 
+#include <sstream>
+#include <map> 
 
 class Node;
 class File;
@@ -39,9 +41,14 @@ class IfElseExpr;
 
 class Node
 {
+protected:
+	std::string tag;
 public:
-	virtual void print() =0; 
-	virtual ~Node() {}
+	Node() {};
+	Node(int set);
+	virtual void print() =0;
+	virtual void generate_code(std::ostream& os) {}; 
+	virtual ~Node() {};
 };
 
 class File : public Node
@@ -52,6 +59,8 @@ private:
 public:
 	File(ExternalDecl* _external_decl=NULL, File* _file=NULL);
 	void print(); 
+	std::string set_offset();
+	void generate_code(std::ostream& os); 
 };
 
 class ExternalDecl : public Node
@@ -61,7 +70,7 @@ private:
 	Decl* decl;
 public:
 	ExternalDecl(FuncDef* _func_def=NULL, Decl* _decl = NULL);
-	void print(); 
+	void print();
 };
 
 class FuncDef : public Node
@@ -201,10 +210,13 @@ class PrimExpr : public Node
 {
 private:
 	std::string value;
+	int flag;
 	Expr* expr;
 public:
-	PrimExpr(std::string _value = "", Expr* _e=NULL); 
-	void print(); 
+	PrimExpr(std::string _value = "", int _flag=-1,Expr* _e=NULL); 
+	void print();
+	void generate_code(std::ostream& os);
+	void get_tag(std::string& _tag); 
 };
 
 class CompStat : public Node
@@ -275,10 +287,12 @@ private:
 	Expression* lhs; 
 	Expression* rhs; 
 	std::string op;
-	UnaryExpr* unary_expr; 
+	UnaryExpr* unary_expr;
 public: 
 	Expression(Expression* _lhs=NULL, Expression* rhs=NULL, std::string _op="", UnaryExpr* _unary_expr=NULL);
+	void get_tag(std::string& _tag); 
 	void print(); 
+	void generate_code(std::ostream& os); 
 };
 
 class UnaryExpr : public Node
@@ -289,7 +303,9 @@ private:
 	std::string unary_op;
 public:
 	UnaryExpr(PostFixExpr* _post_fix_expr=NULL, UnaryExpr* _unary_expr=NULL, std::string _unary_op="");
-	void print(); 
+	void print();
+	void generate_code(std::ostream& os);
+	void get_tag(std::string& _tag); 
 };
 
 class PostFixExpr : public Node
@@ -301,6 +317,8 @@ private:
 public:
 	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="");
 	void print();
+	void generate_code(std::ostream& os); 
+	void get_tag(std::string& _tag); 
 };
 
 class LoopStat : public Node

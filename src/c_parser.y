@@ -2,10 +2,20 @@
 %{
 #include "src/c_parser.h"
 
+#define TMP1 8
+#define TMP2 9
+
 int yylex();
 int yyerror(const char* s);
 
 File* root = NULL;
+int offset = 8; 
+std::map<std::string, int> OffsetMap;
+std::ofstream outfile;
+
+std::string set_offset();
+
+Node::Node(int set) : tag(set_offset()) {}
 
 File::File(ExternalDecl* _external_decl, File* _file) : external_decl(_external_decl), file(_file) {}
 void File::print()
@@ -19,6 +29,9 @@ void File::print()
 		external_decl->print();
 	}
 }
+std::string File::set_offset() {return "";}
+void File::generate_code(std::ostream& os) {}
+
 
 ExternalDecl::ExternalDecl(FuncDef* _func_def, Decl* _decl) : func_def(_func_def), decl(_decl) {}
 void ExternalDecl::print()
@@ -195,6 +208,8 @@ void CondExpr::print()
 	if(expression != NULL)
 	{
 		expression->print(); 
+		outfile.open("testcode.txt");
+		expression->generate_code(outfile);
 	}
 	if(ie_expr != NULL)
 	{
@@ -202,7 +217,7 @@ void CondExpr::print()
 	}
 }
 
-PrimExpr::PrimExpr(std::string _value, Expr* _e) : value(_value), expr(_e) {}
+PrimExpr::PrimExpr(std::string _value, int _flag, Expr* _e) : value(_value), expr(_e), flag(_flag) {tag = set_offset();}
 void PrimExpr::print()
 {
 	if(value != "")
@@ -214,6 +229,34 @@ void PrimExpr::print()
 		expr->print(); 
 	}
 }
+void PrimExpr::generate_code(std::ostream& os) 
+{
+	std::cout << "Tag = " << tag << std::endl; 
+	std::cout << "Val = " << value << std::endl;
+	std::cout <<  std::endl; 	
+
+	os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+ 	switch(flag)
+	{
+		case 1: 
+			os << "move" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl; 
+			break;
+		case 2: 
+			os << "move" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
+			break;
+		case 3: 
+			os << "move" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
+			break;
+		default: 
+			break;
+	}
+	os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+}
+void PrimExpr::get_tag(std::string& _tag)
+{
+	_tag = tag; 
+}
+
 
 CompStat::CompStat(StatList* _stat_list, DeclList* _decl_list) : stat_list(_stat_list), decl_list(_decl_list) {}
 void CompStat::print()
@@ -288,7 +331,14 @@ void ExprStat::print()
 	}
 }
 
-Expression::Expression(Expression* _lhs, Expression* _rhs, std::string _op, UnaryExpr* _unary_expr) : lhs(_lhs), rhs(_rhs), op(_op), unary_expr(_unary_expr) {}
+Expression::Expression(Expression* _lhs, Expression* _rhs, std::string _op, UnaryExpr* _unary_expr) : lhs(_lhs), rhs(_rhs), op(_op), unary_expr(_unary_expr) {if(op !="")tag = set_offset();}
+void Expression::get_tag(std::string& _tag)
+{
+	if(op != "") _tag = tag; 
+	else if(lhs != NULL && _tag == "") lhs->get_tag(_tag); 
+	else if(rhs != NULL && _tag == "") rhs->get_tag(_tag); 
+	else if(unary_expr != NULL && _tag == "") unary_expr->get_tag(_tag);
+}
 void Expression::print()
 {
 	if(op != "")
@@ -306,6 +356,39 @@ void Expression::print()
 	if(rhs != NULL)
 	{
 		rhs->print(); 
+	}
+}
+void Expression::generate_code(std::ostream& os)
+{
+	std::string tag_lhs="";
+	std::string tag_rhs="";
+	std::string tag_unary="";
+	if(op != "")
+	{
+	std::cout << "Tag = " << tag << std::endl; 
+	std::cout << "OP = " << op << std::endl;
+	if(lhs != NULL) lhs->get_tag(tag_lhs); 
+	if(rhs != NULL)	rhs->get_tag(tag_rhs); 
+	//if(unary_expr != NULL) unary_expr->get_tag(tag_unary);
+	std::cout << "left = " << tag_lhs << std::endl; 
+	std::cout << "right = " << tag_rhs << std::endl; 
+	std::cout << "unary = " << tag_unary << std::endl; 
+	std::cout << std::endl; 
+	}
+
+	std::stringstream ss; 
+	if(rhs != NULL){rhs->generate_code(os);}
+	if(lhs != NULL){lhs->generate_code(os);}
+	if(unary_expr != NULL){unary_expr->generate_code(os);}
+	if(op == "+")
+	{
+		lhs->get_tag(tag_lhs);
+		rhs->get_tag(tag_rhs);
+
+		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "add" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 }
 
@@ -327,6 +410,16 @@ void UnaryExpr::print()
 		unary_expr->print(); 
 	}
 }
+void UnaryExpr::generate_code(std::ostream& os)
+{
+	if(post_fix_expr != NULL) {post_fix_expr->generate_code(os);}
+}
+void UnaryExpr::get_tag(std::string& _tag)
+{
+	if(post_fix_expr != NULL)
+	if(_tag == "")
+	post_fix_expr->get_tag(_tag); 
+}
 
 PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op) {}
 void PostFixExpr::print()
@@ -343,6 +436,16 @@ void PostFixExpr::print()
 	{
 		std::cout << op << " ";
 	}
+}
+void PostFixExpr::generate_code(std::ostream& os)
+{
+	if(prim_expr != NULL){prim_expr->generate_code(os);}
+}
+void PostFixExpr::get_tag(std::string& _tag)
+{	
+	if(prim_expr != NULL)
+	if(tag == "")
+	prim_expr->get_tag(_tag); 
 }
 
 Expr::Expr(AssExpr* _ass_expr, Expr* _expr) : ass_expr(_ass_expr), expr(_expr) {}
@@ -706,12 +809,12 @@ postfix_expr	: primary_expr {$$ = new PostFixExpr($1);}
 				| postfix_expr DEC {$$ = new PostFixExpr(NULL, $1, $2);}
 				;
 
-primary_expr	: IDENTIFIER {$$ = new PrimExpr($1);} 
-				| INT_VAL {$$ = new PrimExpr($1);} 
-				| FLOAT_VAL {$$ = new PrimExpr($1);}  
-				| CHAR {$$ = new PrimExpr($1);}  
-				| STRING {$$ = new PrimExpr($1);}  
-				| LBRAC expr RBRAC {$$ = new PrimExpr("",$2);}
+primary_expr	: IDENTIFIER {$$ = new PrimExpr($1,0);} 
+				| INT_VAL {$$ = new PrimExpr($1,1);} 
+				| FLOAT_VAL {$$ = new PrimExpr($1,2);}  
+				| CHAR {$$ = new PrimExpr($1,3);}  
+				| STRING {$$ = new PrimExpr($1,4);}  
+				| LBRAC expr RBRAC {$$ = new PrimExpr("",-1,$2);}
 				;
 %%
 
@@ -719,6 +822,15 @@ int yyerror(const char* s)
 {
 	std::cout << s << std::endl;
 	return -1;
+}
+
+std::string set_offset()
+{
+	std::stringstream ss; 
+	ss << "t_" << offset; 
+	OffsetMap[ss.str()] = offset; 
+	offset += 4; 
+	return ss.str(); 
 }
 
 int main() 
