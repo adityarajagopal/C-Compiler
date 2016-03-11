@@ -5,7 +5,8 @@
 #include <string>
 #include <fstream> 
 #include <sstream>
-#include <map> 
+#include <map>
+#include <vector>
 
 class Node;
 class File;
@@ -39,10 +40,13 @@ class PostFixExpr;
 class DoStat;
 class IfElseExpr;
 
+typedef std::string Tag;
+
 class Node
 {
 protected:
-	std::string tag;
+	Tag tag;
+	int scope;
 public:
 	Node() {};
 	Node(int set);
@@ -59,7 +63,6 @@ private:
 public:
 	File(ExternalDecl* _external_decl=NULL, File* _file=NULL);
 	void print(); 
-	std::string set_offset();
 	void generate_code(std::ostream& os); 
 };
 
@@ -71,6 +74,8 @@ private:
 public:
 	ExternalDecl(FuncDef* _func_def=NULL, Decl* _decl = NULL);
 	void print();
+	void generate_code(std::ostream& os); 
+
 };
 
 class FuncDef : public Node
@@ -82,6 +87,7 @@ private:
 public:
 	FuncDef(DeclSpec* _decl_spec=NULL, Declr* _declr=NULL, CompStat* _comp_stat=NULL); 
 	void print(); 
+	void generate_code(std::ostream& os); 
 };
 
 class Decl : public Node
@@ -92,6 +98,7 @@ private:
 public:
 	Decl(DeclSpec* _decl_spec = NULL, InitList* _init_list = NULL);
 	void print();
+	void generate_code(std::ostream& os);
 };
 
 class DeclSpec : public Node
@@ -120,7 +127,8 @@ private:
 	InitList* init_list; 
 public:
 	InitList(InitDeclr* _init_declr = NULL, InitList* _init_list = NULL); 
-	void print(); 
+	void print();
+	void generate_code(std::ostream& os);
 };
 
 class InitDeclr : public Node
@@ -183,7 +191,10 @@ private:
 public:
 	AssExpr(CondExpr* _cond_expr=NULL, UnaryExpr* _unary_expr=NULL, std::string _ass_oper="", AssExpr* _ass_expr=NULL);
 	void print(); 
+	void generate_code(std::ostream& os);
+	void get_tag(std::string& _tag);
 };
+
 
 class CondExpr : public Node
 {
@@ -192,7 +203,9 @@ private:
 	IfElseExpr* ie_expr;
 public:
 	CondExpr(Expression* _expression = NULL, IfElseExpr* _ie_expr=NULL);
-	void print(); 
+	void print();
+	void get_tag(std::string& _tag);
+	void generate_code(std::ostream& os);
 };
 
 class IfElseExpr : public Node
@@ -226,7 +239,8 @@ private:
 	DeclList* decl_list;
 public:
 	CompStat(StatList* _stat_list=NULL, DeclList* _decl_list=NULL);
-	void print(); 
+	void print();
+	void generate_code(std::ostream& os); 
 };
 
 class DeclList : public Node
@@ -236,7 +250,8 @@ private:
 	DeclList* decl_list; 
 public: 
 	DeclList(Decl* _decl=NULL, DeclList* _decl_list=NULL); 
-	void print(); 
+	void print();
+	void generate_code(std::ostream& os);
 };
 
 class StatList : public Node
