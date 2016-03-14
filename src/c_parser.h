@@ -223,7 +223,8 @@ private:
 	CondExpr* else_expr;
 public: 
 	IfElseExpr(Expression* _ic=NULL, Expr* _ie=NULL, CondExpr* _ee=NULL); 
-	void print(); 
+	void print();
+	void generate_code(std::ostream& os); 
 };
 
 class PrimExpr : public Node
