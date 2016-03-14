@@ -13,9 +13,12 @@ std::ofstream outfile;
 File* root = NULL;
 int offset = 8;
 int global_scope = 0; 
+int arg_reg = 4; 
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
-std::map<std::string, int> FuncMap; 
+std::map<std::string, int> FuncMap;
+
+std::stringstream TUnit , Hdr, SetupFp, os, RestoreFp, Ftr;  
 
 std::string set_offset()
 {
@@ -41,10 +44,19 @@ void File::print()
 	}
 }
 //std::string File::set_offset() {return "";}
-void File::generate_code(std::ostream& os) 
+void File::generate_code() 
 {
-	if(external_decl != NULL) {external_decl->generate_code(os);}
-	if(file != NULL) {file->generate_code(os);}
+	if(external_decl != NULL) {external_decl->generate_code();}
+	
+	TUnit << Hdr.str() << SetupFp.str() << os.str() << RestoreFp.str() << Ftr.str() << std::endl; 
+	
+	Hdr.str(""); 
+	SetupFp.str("");
+	os.str(""); 
+	RestoreFp.str(""); 
+	Ftr.str(""); 
+	
+	if(file != NULL) {file->generate_code();}
 }
 
 
@@ -60,10 +72,10 @@ void ExternalDecl::print()
 		func_def->print(); 
 	}
 }
-void ExternalDecl::generate_code(std::ostream& os)
+void ExternalDecl::generate_code()
 {
-	if(func_def != NULL){func_def->generate_code(os);}
-	if(decl != NULL) {decl->generate_code(os);}
+	if(func_def != NULL){func_def->generate_code();}
+	if(decl != NULL) {decl->generate_code();}
 }
 
 
@@ -85,31 +97,40 @@ void FuncDef::print()
 		std::cout << "}" << std::endl;
 	}
 }
-void FuncDef::generate_code(std::ostream& os)
+void FuncDef::generate_code()
 {
 	FuncMap[declr->get_id()] = offset;
 	offset = 8;
 
-	os << "\t" << ".align\t2" << std::endl; 
-	os << "\t" << ".globl\t" << declr->get_id();
-	os << std::endl; 
-	os << "\t" << ".type\t" << declr->get_id(); 
-	os << ", @function" << std::endl; 
-	os << declr->get_id();  
-	os << ":" << std::endl;
+	Hdr << "\t" << ".align\t2" << std::endl; 
+	Hdr << "\t" << ".globl\t" << declr->get_id();
+	Hdr << std::endl; 
+	Hdr << "\t" << ".type\t" << declr->get_id(); 
+	Hdr << ", @function" << std::endl; 
+	Hdr << declr->get_id();  
+	Hdr << ":" << std::endl;
 
 	if(comp_stat != NULL)
 	{
 		global_scope++;
-		comp_stat->generate_code(os);
+		comp_stat->generate_code();
 		global_scope--;
 	}
+	
+	SetupFp << "addiu\t$sp,$sp,-" << offset << std::endl;
+	SetupFp << "sw\t$fp," << offset-4 << "($sp)" << std::endl;
+	SetupFp << "move\t$fp,$sp" << std::endl;
 
-	os << "\t" << ".end\t" << declr->get_id(); 
-	os << std::endl; 
-	os << "\t" << ".size\t" << declr->get_id(); 
-	os << ", -" << declr->get_id(); 
-	os << std::endl;
+	RestoreFp << "move\t$sp,$fp" << std::endl; 
+	RestoreFp << "lw\t$fp," << offset-4 << "($sp)" << std::endl; 
+	RestoreFp << "j\t" << "$31" << std::endl; 
+	RestoreFp << "addiu\t$sp,$sp," << offset << std::endl; 
+
+//	Ftr << "\t" << ".end\t" << declr->get_id(); 
+//	Ftr << std::endl; 
+//	Ftr << "\t" << ".size\t" << declr->get_id(); 
+//	Ftr << ", -" << declr->get_id(); 
+//	Ftr << std::endl;
 
 	offset = FuncMap[declr->get_id()]; 
 }
@@ -127,9 +148,9 @@ void Decl::print()
 	}
 	std::cout << ";" << std::endl;
 }
-void Decl::generate_code(std::ostream& os)
+void Decl::generate_code()
 {
-	if(init_list != NULL){init_list->generate_code(os);}
+	if(init_list != NULL){init_list->generate_code();}
 }
 
 DeclSpec::DeclSpec(TypeSpec* _type_spec, DeclSpec* _decl_spec) : type_spec(_type_spec), decl_spec(_decl_spec) {}
@@ -164,10 +185,10 @@ void InitList::print()
 		init_list->print();
 	}
 }
-void InitList::generate_code(std::ostream& os)
+void InitList::generate_code()
 {
-	if(init_declr != NULL){init_declr->generate_code(os);}
-	if(init_list != NULL){init_list->generate_code(os);}
+	if(init_declr != NULL){init_declr->generate_code();}
+	if(init_list != NULL){init_list->generate_code();}
 }
 
 InitDeclr::InitDeclr(Declr* _declr, InitVal* _init_val) : declr(_declr), init_val(_init_val) {}
@@ -183,10 +204,10 @@ void InitDeclr::print()
 		init_val->print(); 
 	}
 }
-void InitDeclr::generate_code(std::ostream& os)
+void InitDeclr::generate_code()
 {
-	if(declr != NULL){declr->generate_code(os);}
-	if(init_val != NULL){init_val->generate_code(os);}
+	if(declr != NULL){declr->generate_code();}
+	if(init_val != NULL){init_val->generate_code();}
 
 	std::string lhs_tag=""; 
 	std::string rhs_tag="";
@@ -227,7 +248,7 @@ void Declr::print()
 		std::cout << ")" << std::endl;
 	}
 }
-void Declr::generate_code(std::ostream& os)
+void Declr::generate_code()
 {
 	if(id != "")
 	{
@@ -240,7 +261,8 @@ void Declr::generate_code(std::ostream& os)
 	std::cout << global_scope << std::endl;
 	std::cout << std::endl; 
 
-	if(declr != NULL){declr->generate_code(os);}
+	if(declr != NULL){declr->generate_code();}
+	if(param_list != NULL){param_list->generate_code();}
 }
 std::string Declr::get_id()
 {
@@ -261,9 +283,9 @@ void InitVal::print()
 		ass_expr->print(); 
 	}
 }
-void InitVal::generate_code(std::ostream& os)
+void InitVal::generate_code()
 {
-	if(ass_expr != NULL){ass_expr->generate_code(os);}
+	if(ass_expr != NULL){ass_expr->generate_code();}
 }
 void InitVal::get_tag(std::string& _tag)
 {
@@ -282,6 +304,11 @@ void ParamList::print()
 		param_list -> print(); 
 	}
 }
+void ParamList::generate_code()
+{
+	if(param_decl != NULL) {param_decl->generate_code();}
+	if(param_list != NULL) {param_list->generate_code();}
+}
 
 ParamDecl::ParamDecl(DeclSpec* _decl_spec, Declr* _declr) : decl_spec(_decl_spec), declr(_declr) {}
 void ParamDecl::print() 
@@ -295,6 +322,20 @@ void ParamDecl::print()
 		declr->print(); 
 	}
 	std::cout << ", ";
+}
+void ParamDecl::generate_code()
+{
+	if(declr != NULL) 
+	{
+		declr->generate_code();
+		std::string d_tag; 
+		declr->get_tag(d_tag); 
+		os << "lw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
+		os << "move\t$" << TMP1 << ",$" << arg_reg << std::endl; 
+		os << "sw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
+
+		arg_reg++; 
+	}
 }
 
 AssExpr::AssExpr(CondExpr* _cond_expr, UnaryExpr* _unary_expr, std::string _ass_oper, AssExpr* _ass_expr) : cond_expr(_cond_expr), unary_expr(_unary_expr), ass_oper(_ass_oper), ass_expr(_ass_expr) 
@@ -320,7 +361,7 @@ void AssExpr::print()
 		ass_expr->print();
 	}
 }
-void AssExpr::generate_code(std::ostream& os)
+void AssExpr::generate_code()
 {
 	if(ass_oper != "") {tag = set_offset();}
 	
@@ -340,17 +381,17 @@ void AssExpr::generate_code(std::ostream& os)
 
 	if(unary_expr != NULL)
 	{
-		unary_expr->generate_code(os);
+		unary_expr->generate_code();
 	}
 
 	if(cond_expr != NULL)
 	{
-		cond_expr->generate_code(os); 
+		cond_expr->generate_code(); 
 	}
 
 	if(ass_expr != NULL)
 	{
-		ass_expr->generate_code(os);
+		ass_expr->generate_code();
 	}
 	
 	if(ass_oper == "+=")
@@ -412,11 +453,11 @@ void CondExpr::print()
 		ie_expr->print(); 
 	}
 }
-void CondExpr::generate_code(std::ostream& os)
+void CondExpr::generate_code()
 {
 	if(ie_expr != NULL) {tag = set_offset();}
-	if(expression != NULL) {expression->generate_code(os);}
-	if(ie_expr != NULL) {ie_expr->generate_code(os);}
+	if(expression != NULL) {expression->generate_code();}
+	if(ie_expr != NULL) {ie_expr->generate_code();}
 }
 void CondExpr::get_tag(std::string& _tag)
 {
@@ -457,7 +498,7 @@ void PrimExpr::print()
 		expr->print(); 
 	}
 }
-void PrimExpr::generate_code(std::ostream& os) 
+void PrimExpr::generate_code() 
 {
 
 	if(VarTagMap[value].empty())
@@ -487,13 +528,13 @@ void PrimExpr::generate_code(std::ostream& os)
  	switch(flag)
 	{
 		case 1: 
-			os << "move" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl; 
+			os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl; 
 			break;
 		case 2: 
-			os << "move" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
+			os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
 			break;
 		case 3: 
-			os << "move" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
+			os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
 			break;
 		default: 
 			break;
@@ -521,10 +562,10 @@ void CompStat::print()
 		stat_list->print(); 
 	}
 }
-void CompStat::generate_code(std::ostream& os)
+void CompStat::generate_code()
 {
-	if(decl_list != NULL){decl_list->generate_code(os);}
-	if(stat_list != NULL){stat_list->generate_code(os);}
+	if(decl_list != NULL){decl_list->generate_code();}
+	if(stat_list != NULL){stat_list->generate_code();}
 }
 
 
@@ -540,10 +581,10 @@ void DeclList::print()
 		decl_list->print(); 
 	}
 }
-void DeclList::generate_code(std::ostream& os)
+void DeclList::generate_code()
 {
-	if(decl != NULL){decl->generate_code(os);}
-	if(decl_list != NULL){decl_list->generate_code(os);}
+	if(decl != NULL){decl->generate_code();}
+	if(decl_list != NULL){decl_list->generate_code();}
 }
 
 StatList::StatList(Stat* _stat, StatList* _stat_list) : stat(_stat), stat_list(_stat_list) {}
@@ -558,11 +599,12 @@ void StatList::print()
 		stat_list->print(); 
 	}
 }
-void StatList::generate_code(std::ostream& os)
+void StatList::generate_code()
 {
-	if(stat != NULL) {stat->generate_code(os);}
-	if(stat_list != NULL) {stat_list->generate_code(os);}
+	if(stat != NULL) {stat->generate_code();}
+	if(stat_list != NULL) {stat_list->generate_code();}
 }
+
 /*
 Stat::Stat(CompStat* _comp_stat, ExprStat* _expr_stat, SelecStat* _selec_stat, LoopStat* _loop_stat, JumpStat* _jump_stat) : comp_stat(_comp_stat), expr_stat(_expr_stat), selec_stat(_selec_stat), loop_stat(_loop_stat), jump_stat(_jump_stat) {}
 void Stat::print()
@@ -588,12 +630,33 @@ void Stat::print()
 		jump_stat->print(); 
 	}
 }
-void Stat::generate_code(std::ostream& os)
+void Stat::generate_code()
 {
-	if(comp_stat != NULL) {comp_stat->generate_code(os);}
-	if(expr_stat != NULL) {expr_stat->generate_code(os);}
+	if(comp_stat != NULL) {comp_stat->generate_code();}
+	if(expr_stat != NULL) {expr_stat->generate_code();}
 }
 */
+
+JumpStat::JumpStat(Expr* _expr, std::string _type) : expr(_expr), type(_type) {} 
+void JumpStat::generate_code()
+{
+	if(type == "return")
+	{	
+		if(expr != NULL)
+		{
+			expr->generate_code();
+			os << "lw\t"<< "$2,";
+			std::string return_tag; 
+			expr->get_tag(return_tag); 
+			os << OffsetMap[return_tag] << "($fp)" << std::endl; 
+		}
+		else
+		{
+			os << "$0" << std::endl; 
+		}
+		
+	}
+}
 
 ExprStat::ExprStat(Expr* _expr) : expr(_expr) {}
 void ExprStat::print()
@@ -603,9 +666,9 @@ void ExprStat::print()
 		expr->print();
 	}
 }
-void ExprStat::generate_code(std::ostream& os)
+void ExprStat::generate_code()
 {
-	if(expr != NULL) {expr->generate_code(os);}
+	if(expr != NULL) {expr->generate_code();}
 }
 
 Expression::Expression(Expression* _lhs, Expression* _rhs, std::string _op, UnaryExpr* _unary_expr) : lhs(_lhs), rhs(_rhs), op(_op), unary_expr(_unary_expr) {}
@@ -635,7 +698,7 @@ void Expression::print()
 		rhs->print(); 
 	}
 }
-void Expression::generate_code(std::ostream& os)
+void Expression::generate_code()
 {
 	if(op !="") tag = set_offset();
 	
@@ -659,9 +722,9 @@ void Expression::generate_code(std::ostream& os)
 	tag_rhs = "";
 
 	std::stringstream ss; 
-	if(rhs != NULL){rhs->generate_code(os);}
-	if(lhs != NULL){lhs->generate_code(os);}
-	if(unary_expr != NULL){unary_expr->generate_code(os);}
+	if(rhs != NULL){rhs->generate_code();}
+	if(lhs != NULL){lhs->generate_code();}
+	if(unary_expr != NULL){unary_expr->generate_code();}
 	if(op == "+")
 	{
 		lhs->get_tag(tag_lhs);
@@ -886,9 +949,9 @@ void UnaryExpr::print()
 		unary_expr->print(); 
 	}
 }
-void UnaryExpr::generate_code(std::ostream& os)
+void UnaryExpr::generate_code()
 {
-	if(post_fix_expr != NULL) {post_fix_expr->generate_code(os);}
+	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
 }
 void UnaryExpr::get_tag(std::string& _tag)
 {
@@ -913,9 +976,9 @@ void PostFixExpr::print()
 		std::cout << op << " ";
 	}
 }
-void PostFixExpr::generate_code(std::ostream& os)
+void PostFixExpr::generate_code()
 {
-	if(prim_expr != NULL){prim_expr->generate_code(os);}
+	if(prim_expr != NULL){prim_expr->generate_code();}
 }
 void PostFixExpr::get_tag(std::string& _tag)
 {	
@@ -936,16 +999,16 @@ void Expr::print()
 	{
 		expr->print(); 
 	}
-	/*
-	if(ass_expr != NULL)
-	{
-		ass_expr->generate_code(outfile);
-	}*/
 }
-void Expr::generate_code(std::ostream& os)
+void Expr::generate_code()
 {
-	if(ass_expr != NULL) {ass_expr->generate_code(os);}
-	if(expr != NULL) {expr->generate_code(os);}
+	if(ass_expr != NULL) {ass_expr->generate_code();}
+	if(expr != NULL) {expr->generate_code();}
+}
+void Expr::get_tag(std::string& _tag)
+{
+	if(ass_expr != NULL) ass_expr->get_tag(_tag);
+	if(expr != NULL) expr->get_tag(_tag); 
 }
 
 LoopStat::LoopStat(ExprStat* _es1, ExprStat* _es2, Expr* _e, Stat* _s, DoStat* _ds) : expr_stat_1(_es1), expr_stat_2(_es2), expr(_e), stat(_s), do_stat(_ds) {}
@@ -1028,7 +1091,7 @@ void IfElseExpr::print()
 		else_expr->print();
 	}
 }
-void IfElseExpr::generate_code(std::ostream& os)
+void IfElseExpr::generate_code()
 {
 	tag = set_offset(); 
 
@@ -1129,7 +1192,7 @@ void IfElseExpr::generate_code(std::ostream& os)
 %% 
 
 file			: external_decl {$$ = new File($1); root = $$;} 
-	 			| file external_decl {$$ = new File($2, $1); root = $$;}
+	 			| external_decl file  {$$ = new File($1, $2); root = $$;}
 				;
 
 external_decl	: function_def {$$ = new ExternalDecl($1);}
@@ -1212,8 +1275,8 @@ expr_statement 	: SEMICOLON {$$ = new ExprStat();}
 				;
 
 jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON 
-				| RETURN SEMICOLON 
-				| RETURN expr SEMICOLON 
+				| RETURN SEMICOLON {$$ = new JumpStat(NULL, "return");}
+				| RETURN expr SEMICOLON {$$ = new JumpStat($2, "return");} 
 				;
 
 expr			: assign_expr {$$ = new Expr($1);}  
@@ -1331,6 +1394,7 @@ int main()
 	yyparse();
 	outfile.open("testcode.txt");
 	//root->print();
-	root->generate_code(outfile); 
+	root->generate_code(); 
+	outfile << "\t.text\n" << TUnit.str(); 
 	outfile.close();
 }

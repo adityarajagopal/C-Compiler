@@ -51,7 +51,7 @@ public:
 	Node() {};
 	Node(int set);
 	virtual void print() =0;
-	virtual void generate_code(std::ostream& os) {};
+	virtual void generate_code() {};
 	virtual ~Node() {};
 };
 
@@ -63,7 +63,7 @@ private:
 public:
 	File(ExternalDecl* _external_decl=NULL, File* _file=NULL);
 	void print(); 
-	void generate_code(std::ostream& os); 
+	void generate_code(); 
 };
 
 class ExternalDecl : public Node
@@ -74,7 +74,7 @@ private:
 public:
 	ExternalDecl(FuncDef* _func_def=NULL, Decl* _decl = NULL);
 	void print();
-	void generate_code(std::ostream& os); 
+	void generate_code(); 
 
 };
 
@@ -87,7 +87,7 @@ private:
 public:
 	FuncDef(DeclSpec* _decl_spec=NULL, Declr* _declr=NULL, CompStat* _comp_stat=NULL); 
 	void print(); 
-	void generate_code(std::ostream& os); 
+	void generate_code(); 
 };
 
 class Decl : public Node
@@ -98,7 +98,7 @@ private:
 public:
 	Decl(DeclSpec* _decl_spec = NULL, InitList* _init_list = NULL);
 	void print();
-	void generate_code(std::ostream& os);
+	void generate_code();
 };
 
 class DeclSpec : public Node
@@ -128,7 +128,7 @@ private:
 public:
 	InitList(InitDeclr* _init_declr = NULL, InitList* _init_list = NULL); 
 	void print();
-	void generate_code(std::ostream& os);
+	void generate_code();
 };
 
 class InitDeclr : public Node
@@ -139,7 +139,7 @@ private:
 public: 
 	InitDeclr(Declr* _declr = NULL, InitVal* _init_val = NULL);
 	void print();
-	void generate_code(std::ostream& os);
+	void generate_code();
 };
 
 class Declr : public Node
@@ -151,7 +151,7 @@ private:
 public:
 	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL); 
 	void print(); 
-	void generate_code(std::ostream& os);
+	void generate_code();
 	std::string get_id();
 	void get_tag(std::string& _tag); 
 };
@@ -163,7 +163,7 @@ private:
 public:
 	InitVal(AssExpr* _ass_expr=NULL); 
 	void print();
-	void generate_code(std::ostream& os);
+	void generate_code();
 	void get_tag(std::string& _tag); 
 };
 
@@ -175,7 +175,7 @@ private:
 public:
 	ParamList(ParamDecl* _param_decl=NULL, ParamList* _param_list=NULL);
 	void print();
-
+	void generate_code(); 
 };
 
 class ParamDecl : public Node
@@ -185,7 +185,8 @@ private:
 	Declr* declr; 
 public:
 	ParamDecl(DeclSpec* _decl_spec=NULL, Declr* _declr=NULL); 
-	void print(); 
+	void print();
+	void generate_code();
 };
 
 class AssExpr : public Node
@@ -198,7 +199,7 @@ private:
 public:
 	AssExpr(CondExpr* _cond_expr=NULL, UnaryExpr* _unary_expr=NULL, std::string _ass_oper="", AssExpr* _ass_expr=NULL);
 	void print(); 
-	void generate_code(std::ostream& os);
+	void generate_code();
 	void get_tag(std::string& _tag);
 };
 
@@ -212,7 +213,7 @@ public:
 	CondExpr(Expression* _expression = NULL, IfElseExpr* _ie_expr=NULL);
 	void print();
 	void get_tag(std::string& _tag);
-	void generate_code(std::ostream& os);
+	void generate_code();
 };
 
 class IfElseExpr : public Node
@@ -224,7 +225,7 @@ private:
 public: 
 	IfElseExpr(Expression* _ic=NULL, Expr* _ie=NULL, CondExpr* _ee=NULL); 
 	void print();
-	void generate_code(std::ostream& os); 
+	void generate_code(); 
 };
 
 class PrimExpr : public Node
@@ -236,7 +237,7 @@ private:
 public:
 	PrimExpr(std::string _value = "", int _flag=-1,Expr* _e=NULL); 
 	void print();
-	void generate_code(std::ostream& os);
+	void generate_code();
 	void get_tag(std::string& _tag); 
 };
 
@@ -248,7 +249,7 @@ private:
 public:
 	CompStat(StatList* _stat_list=NULL, DeclList* _decl_list=NULL);
 	void print();
-	void generate_code(std::ostream& os); 
+	void generate_code(); 
 };
 
 class DeclList : public Node
@@ -259,7 +260,7 @@ private:
 public: 
 	DeclList(Decl* _decl=NULL, DeclList* _decl_list=NULL); 
 	void print();
-	void generate_code(std::ostream& os);
+	void generate_code();
 };
 
 class StatList : public Node
@@ -270,7 +271,7 @@ private:
 public:
 	StatList(Stat* _stat=NULL, StatList* _stat_list=NULL);
 	void print();
-	void generate_code(std::ostream& os);
+	void generate_code();
 };
 
 class Stat : public Node
@@ -285,8 +286,19 @@ private:
 public: 
 	Stat(CompStat* _comp_stat=NULL, ExprStat* _expr_stat=NULL, SelecStat* _selec_stat=NULL, LoopStat* _loop_stat=NULL, JumpStat* _jump_stat=NULL);
 	void print(); 
-	void generate_code(std::ostream& os); 
+	void generate_code(); 
 */
+};
+
+class JumpStat : public Node
+{
+private:
+	Expr* expr;
+	std::string type; 
+public: 
+	JumpStat(Expr* _expr, std::string _type); 
+	void generate_code();
+	void print() {};
 };
 
 class ExprStat : public Node
@@ -296,7 +308,7 @@ private:
 public:
 	ExprStat(Expr* _expr=NULL);
 	void print();
-	void generate_code(std::ostream& os);
+	void generate_code();
 };
 
 class Expr : public Node
@@ -307,7 +319,8 @@ private:
 public:
 	Expr(AssExpr* _ass_exp=NULL, Expr* _expr=NULL);
 	void print();
-	void generate_code(std::ostream& os); 
+	void generate_code();
+	void get_tag(std::string& _tag); 
 };
 
 class Expression : public Node
@@ -321,7 +334,7 @@ public:
 	Expression(Expression* _lhs=NULL, Expression* rhs=NULL, std::string _op="", UnaryExpr* _unary_expr=NULL);
 	void get_tag(std::string& _tag); 
 	void print(); 
-	void generate_code(std::ostream& os); 
+	void generate_code(); 
 };
 
 class UnaryExpr : public Node
@@ -333,7 +346,7 @@ private:
 public:
 	UnaryExpr(PostFixExpr* _post_fix_expr=NULL, UnaryExpr* _unary_expr=NULL, std::string _unary_op="");
 	void print();
-	void generate_code(std::ostream& os);
+	void generate_code();
 	void get_tag(std::string& _tag); 
 };
 
@@ -346,7 +359,7 @@ private:
 public:
 	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="");
 	void print();
-	void generate_code(std::ostream& os); 
+	void generate_code(); 
 	void get_tag(std::string& _tag); 
 };
 
