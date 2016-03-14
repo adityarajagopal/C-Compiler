@@ -51,7 +51,7 @@ public:
 	Node() {};
 	Node(int set);
 	virtual void print() =0;
-	virtual void generate_code(std::ostream& os) {}; 
+	virtual void generate_code(std::ostream& os) {};
 	virtual ~Node() {};
 };
 
@@ -138,7 +138,8 @@ private:
 	InitVal* init_val; 
 public: 
 	InitDeclr(Declr* _declr = NULL, InitVal* _init_val = NULL);
-	void print(); 
+	void print();
+	void generate_code(std::ostream& os);
 };
 
 class Declr : public Node
@@ -150,6 +151,9 @@ private:
 public:
 	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL); 
 	void print(); 
+	void generate_code(std::ostream& os);
+	std::string get_id();
+	void get_tag(std::string& _tag); 
 };
 
 class InitVal : public Node
@@ -159,6 +163,8 @@ private:
 public:
 	InitVal(AssExpr* _ass_expr=NULL); 
 	void print();
+	void generate_code(std::ostream& os);
+	void get_tag(std::string& _tag); 
 };
 
 class ParamList : public Node
@@ -168,7 +174,8 @@ private:
 	ParamList* param_list; 
 public:
 	ParamList(ParamDecl* _param_decl=NULL, ParamList* _param_list=NULL);
-	void print(); 
+	void print();
+
 };
 
 class ParamDecl : public Node
@@ -262,10 +269,12 @@ private:
 public:
 	StatList(Stat* _stat=NULL, StatList* _stat_list=NULL);
 	void print();
+	void generate_code(std::ostream& os);
 };
 
 class Stat : public Node
 {
+/*
 private:
 	CompStat* comp_stat; 
 	ExprStat* expr_stat; 
@@ -275,6 +284,8 @@ private:
 public: 
 	Stat(CompStat* _comp_stat=NULL, ExprStat* _expr_stat=NULL, SelecStat* _selec_stat=NULL, LoopStat* _loop_stat=NULL, JumpStat* _jump_stat=NULL);
 	void print(); 
+	void generate_code(std::ostream& os); 
+*/
 };
 
 class ExprStat : public Node
@@ -283,7 +294,8 @@ private:
 	Expr* expr;
 public:
 	ExprStat(Expr* _expr=NULL);
-	void print(); 
+	void print();
+	void generate_code(std::ostream& os);
 };
 
 class Expr : public Node
@@ -293,7 +305,8 @@ private:
 	Expr* expr;
 public:
 	Expr(AssExpr* _ass_exp=NULL, Expr* _expr=NULL);
-	void print(); 
+	void print();
+	void generate_code(std::ostream& os); 
 };
 
 class Expression : public Node
