@@ -29,4 +29,5 @@ addiu	$sp,$sp,32
 j	$31
 nop
 	.end	f
+	.size	f, .-f
 
