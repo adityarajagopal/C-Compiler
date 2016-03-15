@@ -1,8 +1,8 @@
 	.text
 	.align	2
-	.globl	f
-	.type	f, @function
-f:
+	.globl	main
+	.type	main, @function
+main:
 addiu	$sp,$sp,-40
 sw	$fp,36($sp)
 move	$fp,$sp
