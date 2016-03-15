@@ -130,8 +130,9 @@ void FuncDef::generate_code()
 
 	RestoreFp << "move\t$sp,$fp" << std::endl; 
 	RestoreFp << "lw\t$fp," << offset-4 << "($sp)" << std::endl; 
-	RestoreFp << "j\t" << "$31" << std::endl; 
 	RestoreFp << "addiu\t$sp,$sp," << offset << std::endl; 
+	RestoreFp << "j\t" << "$31" << std::endl;
+	RestoreFp << "nop" << std::endl; 
 
 //	Ftr << "\t" << ".end\t" << declr->get_id(); 
 //	Ftr << std::endl; 
