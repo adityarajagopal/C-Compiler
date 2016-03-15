@@ -1,6 +1,7 @@
 	.text
 	.align	2
 	.globl	f
+	.ent	f
 	.type	f, @function
 f:
 addiu	$sp,$sp,-24
@@ -27,4 +28,6 @@ lw	$fp,20($sp)
 addiu	$sp,$sp,24
 j	$31
 nop
+	.end	f
+	.size	f, .-f
 
