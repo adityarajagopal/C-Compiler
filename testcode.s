@@ -37,8 +37,9 @@ sw	$8,12($fp)
 lw	$2,12($fp)
 move	$sp,$fp
 lw	$fp,36($sp)
-j	$31
 addiu	$sp,$sp,40
+j	$31
+nop
 
 	.align	2
 	.globl	f
@@ -66,6 +67,7 @@ lw	$8,32($fp)
 sw	$8,20($fp)
 move	$sp,$fp
 lw	$fp,32($sp)
-j	$31
 addiu	$sp,$sp,36
+j	$31
+nop
 
