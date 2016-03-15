@@ -89,7 +89,9 @@ sw	$8,12($fp)
 lw	$8,12($fp)
 lw	$9,12($fp)
 mul	$8,$8,$9
-nopnopsw	$8,12($fp)
+nop
+nop
+sw	$8,12($fp)
 lw	$8,12($fp)
 sw	$8,12($fp)
 lw	$8,44($fp)
@@ -113,7 +115,9 @@ sw	$8,16($fp)
 lw	$8,12($fp)
 lw	$9,16($fp)
 div	$8,$8,$9
-nopnopsw	$8,12($fp)
+nop
+nop
+sw	$8,12($fp)
 lw	$8,12($fp)
 sw	$8,12($fp)
 lw	$8,16($fp)
@@ -136,7 +140,9 @@ sw	$8,20($fp)
 lw	$8,12($fp)
 lw	$9,20($fp)
 rem	$8,$8,$9
-nopnopsw	$8,12($fp)
+nop
+nop
+sw	$8,12($fp)
 lw	$8,12($fp)
 sw	$8,12($fp)
 lw	$8,44($fp)
