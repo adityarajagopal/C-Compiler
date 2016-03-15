@@ -1,5 +1,2 @@
 *.o
 .DS_STORE
-c_lexer.yy.c
-c_parser.tab.c
-c_parser
