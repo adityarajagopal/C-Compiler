@@ -14,11 +14,14 @@ File* root = NULL;
 int offset = 0;
 int global_scope = 0; 
 int arg_reg = 4; 
+
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
 std::map<std::string, int> FuncMap;
 
-std::stringstream TUnit , Hdr, SetupFp, os, RestoreFp, Ftr;  
+std::vector<Tag> Arguments;
+
+std::stringstream TUnit , Hdr, SetupFp, os, RestoreFp, Ftr, FuncInit;  
 
 std::string set_offset()
 {
@@ -125,13 +128,13 @@ void FuncDef::generate_code()
 		global_scope--;
 	}
 	
-	SetupFp << "addiu\t$sp,$sp,-" << offset+8 << std::endl;
+	SetupFp << "addiu\t$sp,$sp,-" << offset+12 << std::endl;
 	SetupFp << "sw\t$fp," << offset+4 << "($sp)" << std::endl;
 	SetupFp << "move\t$fp,$sp" << std::endl;
 
 	RestoreFp << "move\t$sp,$fp" << std::endl; 
 	RestoreFp << "lw\t$fp," << offset+4 << "($sp)" << std::endl; 
-	RestoreFp << "addiu\t$sp,$sp," << offset+8 << std::endl; 
+	RestoreFp << "addiu\t$sp,$sp," << offset+12 << std::endl; 
 	RestoreFp << "j\t" << "$31" << std::endl;
 	RestoreFp << "nop" << std::endl; 
 
@@ -336,14 +339,19 @@ void ParamDecl::generate_code()
 {
 	if(declr != NULL) 
 	{
+		/*
 		declr->generate_code();
 		std::string d_tag; 
 		declr->get_tag(d_tag); 
 		os << "lw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
 		os << "move\t$" << TMP1 << ",$" << arg_reg << std::endl; 
 		os << "sw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
-
+		
 		arg_reg++; 
+		*/
+		std::string d_tag;
+		declr->get_tag(d_tag); 
+
 	}
 }
 
