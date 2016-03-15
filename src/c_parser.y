@@ -405,7 +405,6 @@ void AssExpr::generate_code()
 	
 	if(ass_oper == "+=")
 	{
-		std::cout << "here" << std::endl;
 		lhs_tag="";
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
@@ -438,7 +437,110 @@ void AssExpr::generate_code()
 		os << "sub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
 	}
+	
+	else if(ass_oper == "*=")
+	{
+		lhs_tag="";
+		rhs_tag="";
+		unary_expr->get_tag(lhs_tag);
+		ass_expr->get_tag(rhs_tag);
+		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "mul" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "nop" << std::endl; 
+		os << "nop" << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+	}
+	
+	else if(ass_oper == "/=")
+	{
+		lhs_tag="";
+		rhs_tag="";
+		unary_expr->get_tag(lhs_tag);
+		ass_expr->get_tag(rhs_tag);
+		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "div" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "nop" << std::endl;
+		os << "nop" << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+	}
+
+	else if(ass_oper == "%=")
+	{
+		lhs_tag="";
+		rhs_tag="";
+		unary_expr->get_tag(lhs_tag);
+		ass_expr->get_tag(rhs_tag);
+		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "rem" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "nop" << std::endl; 
+		os << "nop" << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+	}
+
+	else if(ass_oper == "<<=")
+	{
+		lhs_tag="";
+		rhs_tag="";
+		unary_expr->get_tag(lhs_tag);
+		ass_expr->get_tag(rhs_tag);
+		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "sllv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+	}
+
+	else if(ass_oper == ">>=")
+	{
+		lhs_tag="";
+		rhs_tag="";
+		unary_expr->get_tag(lhs_tag);
+		ass_expr->get_tag(rhs_tag);
+		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "srav" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+	}
+
+	else if(ass_oper == "&=")
+	{
+		lhs_tag="";
+		rhs_tag="";
+		unary_expr->get_tag(lhs_tag);
+		ass_expr->get_tag(rhs_tag);
+		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "and" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+	}
+
+	else if(ass_oper == "^=")
+	{
+		lhs_tag="";
+		rhs_tag="";
+		unary_expr->get_tag(lhs_tag);
+		ass_expr->get_tag(rhs_tag);
+		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "xor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+	}
+
+	else if(ass_oper == "|=")
+	{
+		lhs_tag="";
+		rhs_tag="";
+		unary_expr->get_tag(lhs_tag);
+		ass_expr->get_tag(rhs_tag);
+		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "or" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+	}
 }
+
 void AssExpr::get_tag(std::string& _tag)
 {
 	if(ass_oper != "") _tag = tag; 
@@ -969,7 +1071,7 @@ void UnaryExpr::get_tag(std::string& _tag)
 		post_fix_expr->get_tag(_tag); 
 }
 
-PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op) {}
+PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list) {}
 void PostFixExpr::print()
 {
 	if(prim_expr != NULL)
@@ -995,6 +1097,8 @@ void PostFixExpr::get_tag(std::string& _tag)
 	//if(tag == "")
 	prim_expr->get_tag(_tag); 
 }
+
+ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), arg_list(_arg_list) {}
 
 Expr::Expr(AssExpr* _ass_expr, Expr* _expr) : ass_expr(_ass_expr), expr(_expr) {}
 void Expr::print() 
@@ -1108,13 +1212,12 @@ void IfElseExpr::generate_code()
 	std::string true_tag = ""; 
 	std::string false_tag = ""; 
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[condition_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[true_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP3 << "," << OffsetMap[false_tag] << "($fp)" << std::endl;
-		os << "movn" << "\t$" << TMP1 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
-		os << "movz" << "\t$" << TMP1 << ",$" << TMP3 << ",$" << TMP1 << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "$(fp)" << std::endl; 
-	
+	os << "lw" << "\t$" << TMP1 << "," << OffsetMap[condition_tag] << "($fp)" << std::endl; 
+	os << "lw" << "\t$" << TMP2 << "," << OffsetMap[true_tag] << "($fp)" << std::endl; 
+	os << "lw" << "\t$" << TMP3 << "," << OffsetMap[false_tag] << "($fp)" << std::endl;
+	os << "movn" << "\t$" << TMP1 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
+	os << "movz" << "\t$" << TMP1 << ",$" << TMP3 << ",$" << TMP1 << std::endl;
+	os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "$(fp)" << std::endl; 
 }
 
 %}
@@ -1150,6 +1253,7 @@ void IfElseExpr::generate_code()
 	class Expression* Express;
 	class UnaryExpr* Unary_Expr;
 	class PostFixExpr* Postfix_Expr;
+	class ArgList* Arg_List;
 	class LoopStat* Loop_Stat;
 	class DoStat* Do_Stat;
 	class SelecStat* Selec_Stat;
@@ -1195,6 +1299,7 @@ void IfElseExpr::generate_code()
 %type<Express> logical_or_expr logical_and_expr incl_or_expr excl_or_expr and_expr bool_equal_expr comparison_expr shift_expr addsub_expr multdivmod_expr 
 %type<Unary_Expr> unary_expr
 %type<Postfix_Expr> postfix_expr
+%type<Arg_List> argument_list
 %type<Prim_Expr> primary_expr
 %type<IE_Expr> ie_expr
 
@@ -1361,7 +1466,7 @@ addsub_expr		: multdivmod_expr {$$ = new Expression($1);}
 multdivmod_expr : unary_expr {$$ = new Expression(NULL,NULL,"",$1);}
 				| multdivmod_expr MULT unary_expr{$$ = new Expression($1,NULL,"*",$3);}
 				| multdivmod_expr DIV unary_expr{$$ = new Expression($1,NULL,"/",$3);}
-				| multdivmod_expr MOD unary_expr{$$ = new Expression($1,NULL,"%",$3);}
+				|multdivmod_expr MOD unary_expr{$$ = new Expression($1,NULL,"%",$3);}
 				;
 
 unary_expr		: postfix_expr {$$ = new UnaryExpr($1);}
@@ -1378,9 +1483,15 @@ unary_oper		: BW_AND
 				| NOT
 				;
 
-postfix_expr	: primary_expr {$$ = new PostFixExpr($1);} 
+postfix_expr	: primary_expr {$$ = new PostFixExpr($1);}
+				| postfix_expr LBRAC RBRAC {$$ = new PostFixExpr(NULL,$1);}
+				| postfix_expr LBRAC argument_list RBRAC {$$ = new PostFixExpr(NULL,$1,"",$3);}
 				| postfix_expr INC {$$ = new PostFixExpr(NULL, $1, $2);}
 				| postfix_expr DEC {$$ = new PostFixExpr(NULL, $1, $2);}
+				;
+
+argument_list 	: assign_expr {$$ = new ArgList($1);}
+				| argument_list COMMA assign_expr {$$ = new ArgList($3,$1);}
 				;
 
 primary_expr	: IDENTIFIER {$$ = new PrimExpr($1,0);} 

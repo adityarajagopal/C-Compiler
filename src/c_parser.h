@@ -37,6 +37,7 @@ class SelecStat;
 class JumpStat;
 class Expression;
 class PostFixExpr;
+class ArgList;
 class DoStat;
 class IfElseExpr;
 
@@ -356,11 +357,22 @@ private:
 	PrimExpr* prim_expr; 
 	PostFixExpr* post_fix_expr; 
 	std::string op;
+	ArgList* arg_list; 
 public:
-	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="");
+	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="", ArgList* _arg_list=NULL);
 	void print();
 	void generate_code(); 
 	void get_tag(std::string& _tag); 
+};
+
+class ArgList : public Node
+{
+private:
+	AssExpr* ass_expr; 
+	ArgList* arg_list; 
+public:
+	ArgList(AssExpr* _ass_expr=NULL, ArgList* _arg_list=NULL); 
+	void print() {}; 
 };
 
 class LoopStat : public Node
