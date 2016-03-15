@@ -110,6 +110,13 @@ void FuncDef::generate_code()
 	Hdr << declr->get_id();  
 	Hdr << ":" << std::endl;
 
+	if(declr != NULL)
+	{
+		global_scope++;
+		declr->generate_code(); 
+		global_scope--;
+	}
+
 	if(comp_stat != NULL)
 	{
 		global_scope++;
@@ -132,7 +139,7 @@ void FuncDef::generate_code()
 //	Ftr << ", -" << declr->get_id(); 
 //	Ftr << std::endl;
 
-	offset = FuncMap[declr->get_id()]; 
+	offset = FuncMap[declr->get_id()];
 }
 
 Decl::Decl(DeclSpec* _decl_spec, InitList* _init_list) : decl_spec(_decl_spec), init_list(_init_list) {}
@@ -1392,7 +1399,7 @@ int yyerror(const char* s)
 int main() 
 {
 	yyparse();
-	outfile.open("testcode.txt");
+	outfile.open("testcode.s");
 	//root->print();
 	root->generate_code(); 
 	outfile << "\t.text\n" << TUnit.str(); 
