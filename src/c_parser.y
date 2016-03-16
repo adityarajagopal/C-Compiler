@@ -1514,7 +1514,7 @@ expr			: assign_expr {$$ = new Expr($1);}
 				| expr COMMA assign_expr {$$ = new Expr($3,$1);}
 				;
 
-assign_expr		: conditional_expr {$$ = new AssExpr($1);}
+assign_expr		: conditional_expr {std::cerr << "cond_expr" << std::endl; $$ = new AssExpr($1);}
 				| unary_expr assign_oper assign_expr {$$ = new AssExpr(NULL,$1,$2,$3);}  
 				;
 
@@ -1531,23 +1531,23 @@ assign_oper		: EQUALS {}
 				| OR_EQUALS {}
 				;
 
-conditional_expr : logical_or_expr {$$ = new CondExpr($1);}
+conditional_expr : logical_or_expr {std::cerr << "logor" << std::endl; $$ = new CondExpr($1);}
 			     | ie_expr {$$ = new CondExpr(NULL, $1);}
 				 ;
 
 ie_expr			 : logical_or_expr QUESTION_MARK expr COLON conditional_expr {$$ = new IfElseExpr($1,$3,$5);}
 				 ;
 
-logical_or_expr : logical_and_expr {$$ = new Expression($1);}
+logical_or_expr : logical_and_expr {std::cerr << "logand" << std::endl; $$ = new Expression($1);}
 				| logical_or_expr OR logical_and_expr {$$ = new Expression($1,$3,"||");}
 				;
 
-logical_and_expr : incl_or_expr {$$ = new Expression($1);}
+logical_and_expr : incl_or_expr {std::cerr << "incex" << std::endl; $$ = new Expression($1);}
 				 | logical_and_expr AND incl_or_expr{$$ = new Expression($1,$3,"&&");}
 				 ;
 
-incl_or_expr 	: excl_or_expr{$$ = new Expression($1);}
-				| incl_or_expr BW_OR excl_or_expr{std::cerr << "BW_OR " << yylval.string << std::endl; $$ = new Expression($1,$3,"|");} 
+incl_or_expr 	: excl_or_expr{std::cerr << "fuck" << std::endl;$$ = new Expression($1);}
+				| incl_or_expr BW_OR excl_or_expr{std::cerr << "BW_OR " << yylval.string << std::endl; $$ = new Expression($3,$1,"|");} 
 				;
 
 excl_or_expr	: and_expr{$$ = new Expression($1);}
