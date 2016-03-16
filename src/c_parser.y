@@ -12,6 +12,7 @@ int yyerror(const char* s);
 std::ofstream outfile;
 File* root = NULL;
 int offset = 0;
+int num_arg = 0; 
 int global_scope = 0; 
 int arg_reg = 4; 
 
@@ -51,7 +52,7 @@ void File::generate_code()
 {
 	if(external_decl != NULL) {external_decl->generate_code();}
 	
-	TUnit << Hdr.str() << SetupFp.str() << os.str() << RestoreFp.str() << Ftr.str() << std::endl; 
+	TUnit << Hdr.str() << SetupFp.str() << FuncInit.str() << os.str() << RestoreFp.str() << Ftr.str() << std::endl; 
 	
 	Hdr.str(""); 
 	SetupFp.str("");
@@ -95,15 +96,17 @@ void FuncDef::print()
 	}
 	if(comp_stat != NULL)
 	{
-		std::cout << "{" << std::endl;
+		std::cerr << "{" << std::endl;
 		comp_stat->print(); 
-		std::cout << "}" << std::endl;
+		std::cerr << "}" << std::endl;
 	}
 }
 void FuncDef::generate_code()
 {
 	FuncMap[declr->get_id()] = offset;
-	offset = 8;
+	offset = 8; //need to correct this 
+
+	Arguments.clear(); 
 
 	Hdr << "\t" << ".align\t2" << std::endl; 
 	Hdr << "\t" << ".globl\t" << declr->get_id();
@@ -128,12 +131,25 @@ void FuncDef::generate_code()
 		global_scope--;
 	}
 	
+	for(int i=0; i<4; i++)
+	{
+		FuncInit << "sw\t$a" << i << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 
+	}
+	
+	for(int i = 5; i < Arguments.size(); i++)
+	{
+		FuncInit << "lw\t$" << TMP1 << "," << offset+(i*4) << "($fp)" << std::endl; 
+		FuncInit << "sw\t$" << TMP1 << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 
+	}
+	
 	SetupFp << "addiu\t$sp,$sp,-" << offset+12 << std::endl;
 	SetupFp << "sw\t$fp," << offset+4 << "($sp)" << std::endl;
+	SetupFp << "sw\t$31," << offset+8 << "($sp)" << std::endl;
 	SetupFp << "move\t$fp,$sp" << std::endl;
 
 	RestoreFp << "move\t$sp,$fp" << std::endl; 
 	RestoreFp << "lw\t$fp," << offset+4 << "($sp)" << std::endl; 
+	RestoreFp << "lw\t$31," << offset+8 << "($sp)" << std::endl;
 	RestoreFp << "addiu\t$sp,$sp," << offset+12 << std::endl; 
 	RestoreFp << "j\t" << "$31" << std::endl;
 	RestoreFp << "nop" << std::endl; 
@@ -158,7 +174,7 @@ void Decl::print()
 	{
 		init_list->print(); 
 	}
-	std::cout << ";" << std::endl;
+	std::cerr << ";" << std::endl;
 }
 void Decl::generate_code()
 {
@@ -181,7 +197,7 @@ void DeclSpec::print()
 TypeSpec::TypeSpec(std::string i_type) : type(i_type) {}
 void TypeSpec::print()
 {
-	std::cout << type << " ";
+	std::cerr << type << " ";
 }
 
 InitList::InitList(InitDeclr* _init_declr, InitList* _init_list) : init_declr(_init_declr), init_list(_init_list) {}
@@ -193,7 +209,7 @@ void InitList::print()
 	}
 	if(init_list != NULL)
 	{
-		std::cout << ", ";
+		std::cerr << ", ";
 		init_list->print();
 	}
 }
@@ -212,7 +228,7 @@ void InitDeclr::print()
 	}
 	if(init_val != NULL)
 	{
-		std::cout << "= ";
+		std::cerr << "= ";
 		init_val->print(); 
 	}
 }
@@ -247,7 +263,7 @@ void Declr::print()
 {
 	if(id != "")
 	{
-		std::cout << id << " "; 
+		std::cerr << id << " "; 
 	}
 	if(declr != NULL)
 	{
@@ -255,9 +271,9 @@ void Declr::print()
 	}
 	if(param_list != NULL)
 	{
-		std::cout << "(";
+		std::cerr << "(";
 		param_list->print(); 
-		std::cout << ")" << std::endl;
+		std::cerr << ")" << std::endl;
 	}
 }
 void Declr::generate_code()
@@ -268,10 +284,10 @@ void Declr::generate_code()
 		VarTagMap[id].resize(global_scope + 1); 
 		VarTagMap[id][global_scope] = tag;
 	}
-	std::cout << "TAG: " << tag << std::endl; 
-	std::cout << "ID: " << id << std::endl;
-	std::cout << global_scope << std::endl;
-	std::cout << std::endl; 
+	std::cerr << "TAG: " << tag << std::endl; 
+	std::cerr << "ID: " << id << std::endl;
+	std::cerr << global_scope << std::endl;
+	std::cerr << std::endl; 
 
 	if(declr != NULL){declr->generate_code();}
 	if(param_list != NULL){param_list->generate_code();}
@@ -285,6 +301,7 @@ void Declr::get_tag(std::string& _tag)
 {
 	if(id != "") {_tag = tag;}
 	if(declr != NULL) {declr->get_tag(_tag);}
+	if(param_list != NULL) {param_list->get_tag(_tag);}
 }
 
 InitVal::InitVal(AssExpr* _ass_expr) : ass_expr(_ass_expr) {}
@@ -321,6 +338,10 @@ void ParamList::generate_code()
 	if(param_decl != NULL) {param_decl->generate_code();}
 	if(param_list != NULL) {param_list->generate_code();}
 }
+void ParamList::get_tag(std::string& _tag)
+{
+	if(param_decl != NULL) {param_decl->get_tag(_tag);}
+}
 
 ParamDecl::ParamDecl(DeclSpec* _decl_spec, Declr* _declr) : decl_spec(_decl_spec), declr(_declr) {}
 void ParamDecl::print() 
@@ -333,7 +354,7 @@ void ParamDecl::print()
 	{
 		declr->print(); 
 	}
-	std::cout << ", ";
+	std::cerr << ", ";
 }
 void ParamDecl::generate_code()
 {
@@ -349,10 +370,15 @@ void ParamDecl::generate_code()
 		
 		arg_reg++; 
 		*/
-		std::string d_tag;
-		declr->get_tag(d_tag); 
 
+		std::string d_tag;
+		declr->get_tag(d_tag);
+		Arguments.push_back(d_tag); 
 	}
+}
+void ParamDecl::get_tag(std::string& _tag)
+{
+	if(declr != NULL) {declr->get_tag(_tag);}
 }
 
 AssExpr::AssExpr(CondExpr* _cond_expr, UnaryExpr* _unary_expr, std::string _ass_oper, AssExpr* _ass_expr) : cond_expr(_cond_expr), unary_expr(_unary_expr), ass_oper(_ass_oper), ass_expr(_ass_expr) 
@@ -371,7 +397,7 @@ void AssExpr::print()
 	}
 	if(ass_oper != "")
 	{
-		std::cout << ass_oper << " ";
+		std::cerr << ass_oper << " ";
 	}
 	if(ass_expr != NULL)
 	{
@@ -388,11 +414,11 @@ void AssExpr::generate_code()
 	{	
 		if(unary_expr != NULL) unary_expr->get_tag(lhs_tag);
 		if(ass_expr != NULL) ass_expr->get_tag(rhs_tag);
-		std::cout << "TAG: " << tag << std::endl;
-		std::cout << "OP: " << ass_oper << std::endl; 
-		std::cout << "LHS: " << lhs_tag << std::endl; 
-		std::cout << "RHS: " << rhs_tag << std::endl;
-		std::cout << std::endl; 
+		std::cerr << "TAG: " << tag << std::endl;
+		std::cerr << "OP: " << ass_oper << std::endl; 
+		std::cerr << "LHS: " << lhs_tag << std::endl; 
+		std::cerr << "RHS: " << rhs_tag << std::endl;
+		std::cerr << std::endl; 
 	}
 	
 
@@ -610,7 +636,7 @@ void PrimExpr::print()
 {
 	if(value != "")
 	{
-		std::cout << value << " ";
+		std::cerr << value << " ";
 	}
 	if(expr != NULL)
 	{
@@ -638,10 +664,10 @@ void PrimExpr::generate_code()
 		}
 	}
 
-	std::cout << "TAG = " << tag << std::endl; 
-	std::cout << "VAL = " << value << std::endl;
-	std::cout << global_scope << std::endl;
-	std::cout << std::endl; 
+	std::cerr << "TAG = " << tag << std::endl; 
+	std::cerr << "VAL = " << value << std::endl;
+	std::cerr << global_scope << std::endl;
+	std::cerr << std::endl; 
 
 	os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
  	switch(flag)
@@ -802,7 +828,7 @@ void Expression::print()
 {
 	if(op != "")
 	{
-		std::cout << op << " "; 
+		std::cerr << op << " "; 
 	}
 	if(lhs != NULL)
 	{
@@ -827,14 +853,14 @@ void Expression::generate_code()
 	
 	if(op != "")
 	{
-		std::cout << "Tag = " << tag << std::endl; 
-		std::cout << "OP = " << op << std::endl;
+		std::cerr << "Tag = " << tag << std::endl; 
+		std::cerr << "OP = " << op << std::endl;
 		if(lhs != NULL) lhs->get_tag(tag_lhs); 
 		if(rhs != NULL)	rhs->get_tag(tag_rhs); 
-		std::cout << "left = " << tag_lhs << std::endl; 
-		std::cout << "right = " << tag_rhs << std::endl; 
-		std::cout << "unary = " << tag_unary << std::endl; 
-		std::cout << std::endl; 
+		std::cerr << "left = " << tag_lhs << std::endl; 
+		std::cerr << "right = " << tag_rhs << std::endl; 
+		std::cerr << "unary = " << tag_unary << std::endl; 
+		std::cerr << std::endl; 
 	}
 	
 	tag_lhs = "";
@@ -1060,7 +1086,7 @@ void UnaryExpr::print()
 
 	if(unary_op != "")
 	{
-		std::cout << unary_op << " ";
+		std::cerr << unary_op << " ";
 	}
 
 	if(unary_expr != NULL)
@@ -1092,7 +1118,7 @@ void PostFixExpr::print()
 	}
 	if(op != "")
 	{
-		std::cout << op << " ";
+		std::cerr << op << " ";
 	}
 }
 void PostFixExpr::generate_code()
@@ -1106,7 +1132,21 @@ void PostFixExpr::get_tag(std::string& _tag)
 	prim_expr->get_tag(_tag); 
 }
 
-ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), arg_list(_arg_list) {}
+ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), arg_list(_arg_list)
+{
+	if(ass_expr != NULL)
+	{
+		num_arg++;
+	}
+	else if(ass_expr == NULL)
+	{
+		if(num_arg > offset)
+		{
+			offset = num_arg; 
+		}
+		num_arg=0; 
+	}
+}
 
 Expr::Expr(AssExpr* _ass_expr, Expr* _expr) : ass_expr(_ass_expr), expr(_expr) {}
 void Expr::print() 
@@ -1114,7 +1154,7 @@ void Expr::print()
 	if(ass_expr != NULL)
 	{
 		ass_expr->print();
-		std::cout << std::endl;
+		std::cerr << std::endl;
 	}
 	if(expr != NULL)
 	{
@@ -1137,7 +1177,7 @@ void LoopStat::print()
 {
 	if(expr_stat_1 != NULL)
 	{
-		std::cout << "for:" << std::endl;
+		std::cerr << "for:" << std::endl;
 		expr_stat_1->print(); 
 	}
 	if(expr_stat_2 != NULL)
@@ -1147,13 +1187,13 @@ void LoopStat::print()
 	if(expr != NULL)
 	{
 		if(expr_stat_1 == NULL)
-			std::cout << "while:" << std::endl;
+			std::cerr << "while:" << std::endl;
 		expr->print(); 
-		std::cout << std::endl;
+		std::cerr << std::endl;
 	}
 	if(stat != NULL)
 	{
-		std::cout << "body:" << std::endl;
+		std::cerr << "body:" << std::endl;
 		stat->print(); 
 	}
 }
@@ -1163,12 +1203,12 @@ void DoStat::print()
 {
 	if(stat != NULL)
 	{
-		std::cout << "do:" << std::endl; 
+		std::cerr << "do:" << std::endl; 
 		stat->print(); 
 	}
 	if(expr != NULL)
 	{
-		std::cout << "while:" << std::endl;
+		std::cerr << "while:" << std::endl;
 		expr->print(); 
 	}
 }
@@ -1178,17 +1218,17 @@ void SelecStat::print()
 {
 	if(expr != NULL)
 	{
-		std::cout << "if: ";
+		std::cerr << "if: ";
 		expr->print(); 
 	}
 	if(stat_if != NULL)
 	{
-		std::cout << "body:" << std::endl; 
+		std::cerr << "body:" << std::endl; 
 		stat_if->print(); 
 	}
 	if(stat_else != NULL)
 	{
-		std::cout << "else:" << std::endl;
+		std::cerr << "else:" << std::endl;
 		stat_else->print(); 
 	}
 }
@@ -1198,17 +1238,17 @@ void IfElseExpr::print()
 {
 	if(if_cond != NULL)
 	{
-		std::cout << "if: ";
+		std::cerr << "if: ";
 		if_cond->print(); 
 	}
 	if(if_expr != NULL)
 	{
-		std::cout << "body: "; 
+		std::cerr << "body: "; 
 		if_expr->print(); 
 	}
 	if(else_expr != NULL)
 	{
-		std::cout << "else: ";
+		std::cerr << "else: ";
 		else_expr->print();
 	}
 }
@@ -1513,7 +1553,7 @@ primary_expr	: IDENTIFIER {$$ = new PrimExpr($1,0);}
 
 int yyerror(const char* s)
 {
-	std::cout << s << std::endl;
+	std::cerr << s << std::endl;
 	return -1;
 }
 
@@ -1523,6 +1563,6 @@ int main()
 	outfile.open("testcode.s");
 	//root->print();
 	root->generate_code(); 
-	outfile << "\t.text\n" << TUnit.str(); 
+	std::cout << "\t.text\n" << TUnit.str(); 
 	outfile.close();
 }
