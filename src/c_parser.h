@@ -176,7 +176,8 @@ private:
 public:
 	ParamList(ParamDecl* _param_decl=NULL, ParamList* _param_list=NULL);
 	void print();
-	void generate_code(); 
+	void generate_code();
+	void get_tag(std::string& _tag); 
 };
 
 class ParamDecl : public Node
@@ -188,6 +189,7 @@ public:
 	ParamDecl(DeclSpec* _decl_spec=NULL, Declr* _declr=NULL); 
 	void print();
 	void generate_code();
+	void get_tag(std::string& _tag);
 };
 
 class AssExpr : public Node

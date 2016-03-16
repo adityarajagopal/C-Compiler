@@ -1275,7 +1275,7 @@ void IfElseExpr::generate_code()
 	os << "lw" << "\t$" << TMP3 << "," << OffsetMap[false_tag] << "($fp)" << std::endl;
 	os << "movn" << "\t$" << TMP1 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
 	os << "movz" << "\t$" << TMP1 << ",$" << TMP3 << ",$" << TMP1 << std::endl;
-	os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "$(fp)" << std::endl; 
+	os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 }
 
 %}
