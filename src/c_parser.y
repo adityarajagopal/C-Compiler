@@ -11,7 +11,7 @@ int yyerror(const char* s);
 
 std::ofstream outfile;
 File* root = NULL;
-int offset = 0;
+int offset = 8;
 int num_arg = 0; 
 int global_scope = 0; 
 int arg_reg = 4; 
@@ -123,7 +123,7 @@ void FuncDef::generate_code()
 		declr->generate_code(); 
 		global_scope--;
 	}
-
+//
 	if(comp_stat != NULL)
 	{
 		global_scope++;
@@ -131,6 +131,7 @@ void FuncDef::generate_code()
 		global_scope--;
 	}
 	
+	/*
 	for(int i=0; i<4; i++)
 	{
 		FuncInit << "sw\t$a" << i << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 
@@ -141,7 +142,7 @@ void FuncDef::generate_code()
 		FuncInit << "lw\t$" << TMP1 << "," << offset+(i*4) << "($fp)" << std::endl; 
 		FuncInit << "sw\t$" << TMP1 << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 
 	}
-	
+	*/
 	SetupFp << "addiu\t$sp,$sp,-" << offset+12 << std::endl;
 	SetupFp << "sw\t$fp," << offset+4 << "($sp)" << std::endl;
 	SetupFp << "sw\t$31," << offset+8 << "($sp)" << std::endl;
@@ -289,8 +290,8 @@ void Declr::generate_code()
 	std::cerr << global_scope << std::endl;
 	std::cerr << std::endl; 
 
-	if(declr != NULL){declr->generate_code();}
 	if(param_list != NULL){param_list->generate_code();}
+	if(declr != NULL){declr->generate_code();}
 }
 std::string Declr::get_id()
 {
@@ -371,9 +372,9 @@ void ParamDecl::generate_code()
 		arg_reg++; 
 		*/
 		declr->generate_code(); 
-		std::string d_tag;
-		declr->get_tag(d_tag);
-		Arguments.push_back(d_tag); 
+		//std::string d_tag;
+		//declr->get_tag(d_tag);
+		//Arguments.push_back(d_tag); 
 	}
 }
 void ParamDecl::get_tag(std::string& _tag)
@@ -421,6 +422,10 @@ void AssExpr::generate_code()
 		std::cerr << std::endl; 
 	}
 	
+	if(cond_expr != NULL)
+	{
+		cond_expr->generate_code(); 
+	}
 
 	if(unary_expr != NULL)
 	{
@@ -431,12 +436,6 @@ void AssExpr::generate_code()
 	{
 		ass_expr->generate_code();
 	}
-
-	if(cond_expr != NULL)
-	{
-		cond_expr->generate_code(); 
-	}
-
 	
 	if(ass_oper == "+=")
 	{
@@ -457,10 +456,6 @@ void AssExpr::generate_code()
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
 		
-		std::cerr << "=" << std::endl; 
-		std::cerr << lhs_tag << std::endl; 
-		std::cerr << OffsetMap[rhs_tag] << std::endl; 
-	
 		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
 	}
@@ -616,28 +611,7 @@ void CondExpr::get_tag(std::string& _tag)
 	else if(expression != NULL && _tag == "") expression->get_tag(_tag);
 }
 
-PrimExpr::PrimExpr(std::string _value, int _flag, Expr* _e) : value(_value), expr(_e), flag(_flag) 
-{
-	/*
-	if(VarTagMap[value].empty())
-	{
-		tag = set_offset(); 
-		VarTagMap[value].resize(global_scope + 1); 
-		VarTagMap[value][global_scope] = tag;
-	}
-	else
-	{
-		for(int i=global_scope; i>=0; i--)
-		{
-			if(VarTagMap[value][i] != "")
-			{
-				tag = VarTagMap[value][i]; 
-				break;
-			}
-		}
-	}
-	*/
-}
+PrimExpr::PrimExpr(std::string _value, int _flag, Expr* _e) : value(_value), expr(_e), flag(_flag) {}
 void PrimExpr::print()
 {
 	if(value != "")
@@ -655,7 +629,7 @@ void PrimExpr::generate_code()
 	{
 		if(VarTagMap[value].empty())
 		{
-			tag = set_offset(); 
+			tag = set_offset();
 			VarTagMap[value].resize(global_scope + 1); 
 			VarTagMap[value][global_scope] = tag;
 		}
@@ -670,26 +644,27 @@ void PrimExpr::generate_code()
 				}
 			}
 		}
-	}
 	
+	}
+
 	std::cerr << "TAG = " << tag << std::endl; 
 	std::cerr << "VAL = " << value << std::endl;
 	std::cerr << global_scope << std::endl;
 	std::cerr << std::endl; 
 
-	if (expr != NULL) 
-	{
-		expr->generate_code();
-	}
-	else
-	{
+	//if (expr != NULL) 
+	//{
+//		expr->generate_code();
+//	}
+//	else
+//	{
 		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
  		switch(flag)
 		{
-			case 1: 
+			case 1:
 				os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl; 
 				break;
-			case 2: 
+			case 2:
 				os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
 				break;
 			case 3: 
@@ -699,7 +674,8 @@ void PrimExpr::generate_code()
 				break;
 		}
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
-	}
+//	}
+
 }
 void PrimExpr::get_tag(std::string& _tag)
 {
@@ -883,9 +859,19 @@ void Expression::generate_code()
 	tag_unary = ""; 
 
 	//std::stringstream ss; 
-	if(rhs != NULL){rhs->generate_code();}
-	if(lhs != NULL){lhs->generate_code();}
-	if(unary_expr != NULL){unary_expr->generate_code();}
+	if(rhs != NULL)
+	{
+		rhs->generate_code();
+	}
+	if(unary_expr != NULL)
+	{
+		std::cerr << "HERE" << std::endl; 
+		unary_expr->generate_code();
+	}
+	if(lhs != NULL)
+	{
+		lhs->generate_code();
+	}
 	
 	if(op == "+")
 	{
@@ -901,8 +887,8 @@ void Expression::generate_code()
 
 	if(op == "-")
 	{
-		lhs->get_tag(tag_lhs);
-		rhs->get_tag(tag_rhs);
+		if(lhs != NULL)	lhs->get_tag(tag_lhs);
+		if(rhs != NULL)	rhs->get_tag(tag_rhs);
 
 		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
 		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
@@ -1119,8 +1105,10 @@ void UnaryExpr::generate_code()
 void UnaryExpr::get_tag(std::string& _tag)
 {
 	if(post_fix_expr != NULL)
-	//if(_tag == "")
-		post_fix_expr->get_tag(_tag); 
+	{
+		//if(_tag == "")
+			post_fix_expr->get_tag(_tag); 
+	}
 }
 
 PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list) {}
@@ -1146,12 +1134,15 @@ void PostFixExpr::generate_code()
 void PostFixExpr::get_tag(std::string& _tag)
 {	
 	if(prim_expr != NULL)
-	//if(tag == "")
-	prim_expr->get_tag(_tag); 
+	{
+		//if(_tag == "")
+			prim_expr->get_tag(_tag); 
+	}
 }
 
 ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), arg_list(_arg_list)
 {
+/*
 	if(ass_expr != NULL)
 	{
 		num_arg++;
@@ -1164,6 +1155,7 @@ ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), 
 		}
 		num_arg=0; 
 	}
+*/
 }
 
 Expr::Expr(AssExpr* _ass_expr, Expr* _expr) : ass_expr(_ass_expr), expr(_expr) {}
