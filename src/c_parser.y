@@ -664,12 +664,12 @@ void PrimExpr::generate_code()
 	std::cerr << global_scope << std::endl;
 	std::cerr << std::endl; 
 
-	//if (expr != NULL) 
-	//{
-//		expr->generate_code();
-//	}
-//	else
-//	{
+	if (expr != NULL) 
+	{
+		expr->generate_code();
+	}
+	else
+	{
 		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
  		switch(flag)
 		{
@@ -682,16 +682,17 @@ void PrimExpr::generate_code()
 			case 3: 
 				os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
 				break;
-			default: 
+			default:
 				break;
 		}
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
-//	}
+	}
 
 }
 void PrimExpr::get_tag(std::string& _tag)
 {
-	_tag = tag; 
+	if(expr == NULL) {_tag = tag;}
+	if(expr != NULL) {expr->get_tag(_tag);}
 }
 
 
