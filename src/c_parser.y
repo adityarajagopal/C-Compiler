@@ -11,7 +11,7 @@ int yyerror(const char* s);
 
 std::ofstream outfile;
 File* root = NULL;
-int offset = 8;
+int offset = 16;
 int num_arg = 0; 
 int global_scope = 0; 
 int arg_reg = 4; 
@@ -104,7 +104,7 @@ void FuncDef::print()
 void FuncDef::generate_code()
 {
 	FuncMap[declr->get_id()] = offset;
-	offset = 8; //need to correct this 
+	offset = 16; //need to correct this 
 
 	Arguments.clear(); 
 
@@ -123,26 +123,27 @@ void FuncDef::generate_code()
 		declr->generate_code(); 
 		global_scope--;
 	}
-//
+	
 	if(comp_stat != NULL)
 	{
-		global_scope++;
+		//global_scope++;
 		comp_stat->generate_code();
-		global_scope--;
+		//global_scope--;
 	}
 	
-	/*
-	for(int i=0; i<4; i++)
+	for(int i=0; i<Arguments.size(); i++)
 	{
-		FuncInit << "sw\t$a" << i << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 
+		if(i<4)
+		{
+			FuncInit << "sw\t$a" << i << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 
+		}
+		else
+		{
+			FuncInit << "lw\t$" << TMP1 << "," << offset+(i*4) << "($fp)" << std::endl; 
+			FuncInit << "sw\t$" << TMP1 << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 	
+		}
 	}
-	
-	for(int i = 5; i < Arguments.size(); i++)
-	{
-		FuncInit << "lw\t$" << TMP1 << "," << offset+(i*4) << "($fp)" << std::endl; 
-		FuncInit << "sw\t$" << TMP1 << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 
-	}
-	*/
+
 	SetupFp << "addiu\t$sp,$sp,-" << offset+12 << std::endl;
 	SetupFp << "sw\t$fp," << offset+4 << "($sp)" << std::endl;
 	SetupFp << "sw\t$31," << offset+8 << "($sp)" << std::endl;
@@ -372,9 +373,9 @@ void ParamDecl::generate_code()
 		arg_reg++; 
 		*/
 		declr->generate_code(); 
-		//std::string d_tag;
-		//declr->get_tag(d_tag);
-		//Arguments.push_back(d_tag); 
+		std::string d_tag;
+		declr->get_tag(d_tag);
+		Arguments.push_back(d_tag); 
 	}
 }
 void ParamDecl::get_tag(std::string& _tag)
@@ -447,6 +448,7 @@ void AssExpr::generate_code()
 		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
 		os << "add" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	if(ass_oper == "=")
@@ -458,6 +460,7 @@ void AssExpr::generate_code()
 		
 		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	
@@ -471,6 +474,7 @@ void AssExpr::generate_code()
 		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
 		os << "sub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	else if(ass_oper == "*=")
@@ -485,6 +489,7 @@ void AssExpr::generate_code()
 		os << "nop" << std::endl; 
 		os << "nop" << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	else if(ass_oper == "/=")
@@ -499,6 +504,7 @@ void AssExpr::generate_code()
 		os << "nop" << std::endl;
 		os << "nop" << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "%=")
@@ -513,6 +519,7 @@ void AssExpr::generate_code()
 		os << "nop" << std::endl; 
 		os << "nop" << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "<<=")
@@ -525,6 +532,7 @@ void AssExpr::generate_code()
 		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
 		os << "sllv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == ">>=")
@@ -537,6 +545,7 @@ void AssExpr::generate_code()
 		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
 		os << "srav" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "&=")
@@ -549,6 +558,7 @@ void AssExpr::generate_code()
 		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
 		os << "and" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "^=")
@@ -561,6 +571,7 @@ void AssExpr::generate_code()
 		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
 		os << "xor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "|=")
@@ -573,6 +584,7 @@ void AssExpr::generate_code()
 		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
 		os << "or" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 }
 
@@ -700,8 +712,10 @@ void CompStat::print()
 }
 void CompStat::generate_code()
 {
+	global_scope++;
 	if(decl_list != NULL){decl_list->generate_code();}
 	if(stat_list != NULL){stat_list->generate_code();}
+	global_scope--;
 }
 
 
@@ -1130,14 +1144,32 @@ void PostFixExpr::print()
 void PostFixExpr::generate_code()
 {
 	if(prim_expr != NULL){prim_expr->generate_code();}
+	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
+	if(op != "")
+	{
+		tag = set_offset(); 
+		std::string lhs_tag; 
+		if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+		if(op == "++")
+		{
+			os << "lw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
+			os << "sw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
+			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+		}
+		if(op == "--")
+		{
+			os << "lw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
+			os << "sw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
+			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+		}
+	}
 }
 void PostFixExpr::get_tag(std::string& _tag)
-{	
-	if(prim_expr != NULL)
-	{
-		//if(_tag == "")
-			prim_expr->get_tag(_tag); 
-	}
+{
+	if(op != "") {_tag = tag;}
+	if(prim_expr != NULL) {prim_expr->get_tag(_tag);}
 }
 
 ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), arg_list(_arg_list)
@@ -1488,7 +1520,7 @@ logical_and_expr : incl_or_expr {$$ = new Expression($1);}
 				 ;
 
 incl_or_expr 	: excl_or_expr{$$ = new Expression($1);}
-				| incl_or_expr BW_OR excl_or_expr{$$ = new Expression($1,$3,"|");}
+				| incl_or_expr BW_OR excl_or_expr{std::cerr << "BW_OR " << yylval.string << std::endl; $$ = new Expression($1,$3,"|");} 
 				;
 
 excl_or_expr	: and_expr{$$ = new Expression($1);}
@@ -1570,9 +1602,6 @@ int yyerror(const char* s)
 int main() 
 {
 	yyparse();
-	outfile.open("testcode.s");
-	//root->print();
 	root->generate_code(); 
 	std::cout << "\t.text\n" << TUnit.str(); 
-	outfile.close();
 }

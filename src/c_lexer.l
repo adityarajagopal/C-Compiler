@@ -96,9 +96,10 @@ TAB					(\t)*
 SPACE 				[ ]*
 %%
 
+{OR_EQUALS}			{yylval.string = strdup(yytext); return OR_EQUALS;}
 {OR}				{yylval.string = strdup(yytext); return OR;}
-{AND}				{yylval.string = strdup(yytext); return AND;}
 {BW_OR}				{yylval.string = strdup(yytext); return BW_OR;}
+{AND}				{yylval.string = strdup(yytext); return AND;}
 {BW_XOR}			{yylval.string = strdup(yytext); return BW_XOR;}
 {BW_AND}			{yylval.string = strdup(yytext); return BW_AND;}
 {EQUAL_EQUAL}		{yylval.string = strdup(yytext); return EQUAL_EQUAL;}
@@ -131,7 +132,6 @@ SPACE 				[ ]*
 {LEFT_EQUALS}		{yylval.string = strdup(yytext); return LEFT_EQUALS;}
 {RIGHT_EQUALS}		{yylval.string = strdup(yytext); return RIGHT_EQUALS;} 
 {AND_EQUALS}		{yylval.string = strdup(yytext); return AND_EQUALS;}	
-{OR_EQUALS}			{yylval.string = strdup(yytext); return OR_EQUALS;}
 {XOR_EQUALS}		{yylval.string = strdup(yytext); return XOR_EQUALS;}
 {LBRAC}				{return LBRAC;}
 {RBRAC}				{return RBRAC;}
