@@ -613,13 +613,13 @@ void CondExpr::print()
 }
 void CondExpr::generate_code()
 {
-	if(ie_expr != NULL) {tag = set_offset();}
+	//if(ie_expr != NULL) {tag = set_offset();}
 	if(expression != NULL) {expression->generate_code();}
 	if(ie_expr != NULL) {ie_expr->generate_code();}
 }
 void CondExpr::get_tag(std::string& _tag)
 {
-	if(ie_expr != NULL) {_tag = tag;} 
+	if(ie_expr != NULL) {ie_expr->get_tag(_tag);} 
 	else if(expression != NULL && _tag == "") expression->get_tag(_tag);
 }
 
@@ -1150,19 +1150,25 @@ void PostFixExpr::generate_code()
 		tag = set_offset(); 
 		std::string lhs_tag; 
 		if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+
+		std::cerr << "TAG: " << tag << std::endl; 
+		std::cerr << "OP: " << op << std::endl; 
+		std::cerr << "LHS: " << lhs_tag << std::endl;
+		std::cerr << std::endl;
+
 		if(op == "++")
 		{
 			os << "lw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
 			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
 			os << "sw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
-			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
 		}
 		if(op == "--")
 		{
 			os << "lw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
 			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
 			os << "sw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
-			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
 		}
 	}
 }
@@ -1301,6 +1307,22 @@ void IfElseExpr::generate_code()
 	std::string condition_tag = ""; 
 	std::string true_tag = ""; 
 	std::string false_tag = ""; 
+	
+	if(if_cond != NULL)
+	{
+		if_cond->generate_code();
+		if_cond->get_tag(condition_tag);
+	}
+	if(if_expr != NULL)
+	{
+		if_expr->generate_code();
+		if_expr->get_tag(true_tag);
+	}
+	if(else_expr != NULL)
+	{
+		else_expr->generate_code();
+		else_expr->get_tag(false_tag);
+	}
 
 	os << "lw" << "\t$" << TMP1 << "," << OffsetMap[condition_tag] << "($fp)" << std::endl; 
 	os << "lw" << "\t$" << TMP2 << "," << OffsetMap[true_tag] << "($fp)" << std::endl; 
@@ -1308,6 +1330,10 @@ void IfElseExpr::generate_code()
 	os << "movn" << "\t$" << TMP1 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
 	os << "movz" << "\t$" << TMP1 << ",$" << TMP3 << ",$" << TMP1 << std::endl;
 	os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+}
+void IfElseExpr::get_tag(std::string& _tag)
+{
+	_tag = tag; 
 }
 
 %}
