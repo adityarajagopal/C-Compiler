@@ -250,17 +250,8 @@ void InitDeclr::generate_code()
 	}
 }
 
-Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list) : id(_id), declr(_declr), param_list(_param_list) 
-{
-/*
-	if(id != "")
-	{
-		tag = set_offset();
-		VarTagMap[id].resize(global_scope + 1); 
-		VarTagMap[id][global_scope] = tag;
-	}
-*/
-}
+Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list) : id(_id), declr(_declr), param_list(_param_list){}
+
 void Declr::print()
 {
 	if(id != "")
@@ -1116,9 +1107,53 @@ void UnaryExpr::print()
 void UnaryExpr::generate_code()
 {
 	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
+	
+	if(unary_expr != NULL)
+	{
+		tag = set_offset(); 
+		unary_expr->generate_code(); 
+		std::string rhs_tag; 
+		unary_expr->get_tag(rhs_tag);
+
+		if(unary_op == "++")
+		{
+			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
+			os << "sw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+		}
+		if(unary_op == "--")
+		{
+			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
+			os << "sw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+		}
+		if(unary_op == "-")
+		{
+			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+			os << "neg\t$" << TMP1 << ",$" << TMP1 << std::endl;
+			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		if(unary_op == "~")
+		{
+			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+			os << "not\t$" << TMP1 << ",$" << TMP1 << std::endl;
+			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		if(unary_op == "!")
+		{
+			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+			os << "movn\t$" << TMP1 << ",$0,$" << TMP1 << std::endl;
+			os << "li\t$" << TMP2 << ",1" << std::endl; 
+			os << "movz\t$" << TMP1 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
+			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+	}
 }
 void UnaryExpr::get_tag(std::string& _tag)
 {
+	if(unary_expr != NULL) {_tag = tag;}
 	if(post_fix_expr != NULL)
 	{
 		//if(_tag == "")
