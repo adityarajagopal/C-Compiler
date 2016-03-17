@@ -97,56 +97,56 @@ TAB					(\t)*
 SPACE 				[ ]*
 %%
 
-{OR_EQUALS}			{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return OR_EQUALS;}
-{OR}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return OR;}
-{BW_OR}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return BW_OR;}
-{AND}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return AND;}
-{BW_XOR}			{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return BW_XOR;}
-{BW_AND}			{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return BW_AND;}
-{EQUAL_EQUAL}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return EQUAL_EQUAL;}
-{NOT_EQUAL}			{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return NOT_EQUAL;}
-{LT}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return LT;}
-{GT}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return GT;}
-{LE}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return LE;}
-{GE}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return GE;}
-{LEFT_SHIFT}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return LEFT_SHIFT;}
-{RIGHT_SHIFT}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return RIGHT_SHIFT;}
-{ADD}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return ADD;}
-{SUB}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return SUB;}
-{MULT}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return MULT;}
-{DIV}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return DIV;}
-{MOD}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return MOD;}
-{NOT}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return NOT;}
-{BW_NOT}			{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return BW_NOT;}
-{INC}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return INC;}
-{DEC}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return DEC;}
+{OR_EQUALS}			{yylval.string = strdup(yytext);  return OR_EQUALS;}
+{OR}				{yylval.string = strdup(yytext);  return OR;}
+{BW_OR}				{yylval.string = strdup(yytext);  return BW_OR;}
+{AND}				{yylval.string = strdup(yytext);  return AND;}
+{BW_XOR}			{yylval.string = strdup(yytext);  return BW_XOR;}
+{BW_AND}			{yylval.string = strdup(yytext);  return BW_AND;}
+{EQUAL_EQUAL}		{yylval.string = strdup(yytext);  return EQUAL_EQUAL;}
+{NOT_EQUAL}			{yylval.string = strdup(yytext);  return NOT_EQUAL;}
+{LT}				{yylval.string = strdup(yytext);  return LT;}
+{GT}				{yylval.string = strdup(yytext);  return GT;}
+{LE}				{yylval.string = strdup(yytext);  return LE;}
+{GE}				{yylval.string = strdup(yytext);  return GE;}
+{LEFT_SHIFT}		{yylval.string = strdup(yytext);  return LEFT_SHIFT;}
+{RIGHT_SHIFT}		{yylval.string = strdup(yytext);  return RIGHT_SHIFT;}
+{ADD}				{yylval.string = strdup(yytext);  return ADD;}
+{SUB}				{yylval.string = strdup(yytext);  return SUB;}
+{MULT}				{yylval.string = strdup(yytext);  return MULT;}
+{DIV}				{yylval.string = strdup(yytext);  return DIV;}
+{MOD}				{yylval.string = strdup(yytext);  return MOD;}
+{NOT}				{yylval.string = strdup(yytext);  return NOT;}
+{BW_NOT}			{yylval.string = strdup(yytext);  return BW_NOT;}
+{INC}				{yylval.string = strdup(yytext);  return INC;}
+{DEC}				{yylval.string = strdup(yytext);  return DEC;}
 {SEMICOLON}			{return SEMICOLON;}
 {COMMA}				{return COMMA;}
 {LCURLY}			{return LCURLY;}
 {RCURLY}			{return RCURLY;}
-{EQUALS}			{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return EQUALS;}
-{MUL_EQUALS} 		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return MUL_EQUALS;}
-{DIV_EQUALS}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return DIV_EQUALS;} 
-{MOD_EQUALS}	   	{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return MOD_EQUALS;}	 	
-{ADD_EQUALS}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return ADD_EQUALS;}	
-{SUB_EQUALS}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return SUB_EQUALS;}
-{LEFT_EQUALS}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return LEFT_EQUALS;}
-{RIGHT_EQUALS}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return RIGHT_EQUALS;} 
-{AND_EQUALS}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return AND_EQUALS;}	
-{XOR_EQUALS}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return XOR_EQUALS;}
+{EQUALS}			{yylval.string = strdup(yytext);  return EQUALS;}
+{MUL_EQUALS} 		{yylval.string = strdup(yytext);  return MUL_EQUALS;}
+{DIV_EQUALS}		{yylval.string = strdup(yytext);  return DIV_EQUALS;} 
+{MOD_EQUALS}	   	{yylval.string = strdup(yytext);  return MOD_EQUALS;}	 	
+{ADD_EQUALS}		{yylval.string = strdup(yytext);  return ADD_EQUALS;}	
+{SUB_EQUALS}		{yylval.string = strdup(yytext);  return SUB_EQUALS;}
+{LEFT_EQUALS}		{yylval.string = strdup(yytext);  return LEFT_EQUALS;}
+{RIGHT_EQUALS}		{yylval.string = strdup(yytext);  return RIGHT_EQUALS;} 
+{AND_EQUALS}		{yylval.string = strdup(yytext);  return AND_EQUALS;}	
+{XOR_EQUALS}		{yylval.string = strdup(yytext);  return XOR_EQUALS;}
 {LBRAC}				{return LBRAC;}
 {RBRAC}				{return RBRAC;}
-{QUESTION_MARK}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return QUESTION_MARK;}
-{COLON}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return COLON;}
+{QUESTION_MARK}		{yylval.string = strdup(yytext);  return QUESTION_MARK;}
+{COLON}				{yylval.string = strdup(yytext);  return COLON;}
 
-{OCTAL}             {/*yylval.i_num = strtol(yytext,NULL,8);sprintf(yylval.string, %o, strtol(yytext,NULL,8)*/yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return INT_VAL;}
-{HEXADECIMAL}       {/*yylval.i_num = strtol(yytext,NULL,16);*/yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return INT_VAL;}
-{DECIMAL}			{/*yylval.i_num = strtol(yytext,NULL,10);*/yylval.string = strdup(yytext); std::cerr << yylval.string << "decimal" << std::endl; return INT_VAL;}
-{FLOAT}				{/*yylval.f_num = atof(yytext);*/ yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return FLOAT_VAL;}
-{CHAR}				{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return CHAR;}
-{STRING}			{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return STRING;}
+{OCTAL}             {/*yylval.i_num = strtol(yytext,NULL,8);sprintf(yylval.string, %o, strtol(yytext,NULL,8)*/yylval.string = strdup(yytext);  return INT_VAL;}
+{HEXADECIMAL}       {/*yylval.i_num = strtol(yytext,NULL,16);*/yylval.string = strdup(yytext);  return INT_VAL;}
+{DECIMAL}			{/*yylval.i_num = strtol(yytext,NULL,10);*/yylval.string = strdup(yytext); return INT_VAL;}
+{FLOAT}				{/*yylval.f_num = atof(yytext);*/ yylval.string = strdup(yytext);  return FLOAT_VAL;}
+{CHAR}				{yylval.string = strdup(yytext);  return CHAR;}
+{STRING}			{yylval.string = strdup(yytext);  return STRING;}
 
-{INT_KWD}			{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return TYPE;}
+{INT_KWD}			{yylval.string = strdup(yytext);  return TYPE;}
 {IF_KWD}			{return IF;}
 {ELSE_KWD}			{return ELSE;}
 {WHILE_KWD}			{return WHILE;}
@@ -180,7 +180,7 @@ SPACE 				[ ]*
 {DEFAULT_KWD}		{return DEFAULT;}
 {SIZEOF}			{return SIZEOF;}
 
-{IDENTIFIER}		{yylval.string = strdup(yytext); std::cerr << yylval.string << std::endl; return IDENTIFIER;}
+{IDENTIFIER}		{yylval.string = strdup(yytext);  return IDENTIFIER;}
 
 {TAB}|{SPACE}|{NEW_LINE}		{}
 {PRE_SHARP}|{INVALID_SHARP}		{}
