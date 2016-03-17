@@ -1144,10 +1144,10 @@ void UnaryExpr::generate_code()
 		if(unary_op == "!")
 		{
 			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
-			os << "movn\t$" << TMP1 << ",$0,$" << TMP1 << std::endl;
+			os << "movn\t$" << TMP3 << ",$0,$" << TMP1 << std::endl;
 			os << "li\t$" << TMP2 << ",1" << std::endl; 
-			os << "movz\t$" << TMP1 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
-			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+			os << "movz\t$" << TMP3 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
+			os << "sw\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
 	}
 }
