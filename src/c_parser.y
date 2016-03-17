@@ -678,19 +678,16 @@ void PrimExpr::generate_code()
 			case 1:
 				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
 				os << "li" << "\t$" << TMP1 << "," << std::stoi(value,NULL,10) << std::endl;
-				std::cerr << "INT_VAL: " << std::stoi(value,NULL,10) << std::endl;  
 				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 2:
 				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
 				os << "li" << "\t$" << TMP1 << "," << std::stoi(value,NULL,8) << std::endl;  
-				std::cerr << "OCT_VAL: " << std::stoi(value,NULL,8) << std::endl;  
 				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 3: 
 				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
 				os << "li" << "\t$" << TMP1 << "," << std::stoi(value,NULL,16) << std::endl;  
-				std::cerr << "HEX_VAL: " << std::stoi(value,NULL,16) << std::endl;  
 				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			default:
@@ -1519,11 +1516,11 @@ statement_list	: statement {$$ = new StatList($1);}
 				| statement statement_list {$$ = new StatList($1,$2);}
 				
 
-statement		: compound_statement //{$$ = new Stat($1);} 
-				| expr_statement //{$$ = new Stat(NULL,$1);}
-				| selection_statement //{$$ = new Stat(NULL,NULL,$1);}
-				| loop_statement //{$$ = new Stat(NULL,NULL,NULL,$1,NULL);}
-				| jump_statement //{$$ = new Stat();}
+statement		: compound_statement {} 
+				| expr_statement {}
+				| selection_statement {}
+				| loop_statement {}
+				| jump_statement {}
 				;
 
 declarator		: IDENTIFIER {$$ = new Declr($1);} 
@@ -1564,7 +1561,7 @@ expr_statement 	: SEMICOLON {$$ = new ExprStat();}
 				| expr SEMICOLON {$$ = new ExprStat($1);}
 				;
 
-jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON 
+jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON {} 
 				| RETURN SEMICOLON {$$ = new JumpStat(NULL, "return");}
 				| RETURN expr SEMICOLON {$$ = new JumpStat($2, "return");} 
 				;
