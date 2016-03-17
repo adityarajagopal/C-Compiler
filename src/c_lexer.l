@@ -139,8 +139,8 @@ SPACE 				[ ]*
 {QUESTION_MARK}		{yylval.string = strdup(yytext);  return QUESTION_MARK;}
 {COLON}				{yylval.string = strdup(yytext);  return COLON;}
 
-{OCTAL}             {/*yylval.i_num = strtol(yytext,NULL,8);sprintf(yylval.string, %o, strtol(yytext,NULL,8)*/yylval.string = strdup(yytext);  return INT_VAL;}
-{HEXADECIMAL}       {/*yylval.i_num = strtol(yytext,NULL,16);*/yylval.string = strdup(yytext);  return INT_VAL;}
+{OCTAL}             {/*yylval.i_num = strtol(yytext,NULL,8);sprintf(yylval.string, %o, strtol(yytext,NULL,8)*/yylval.string = strdup(yytext);  return OCT_VAL;}
+{HEXADECIMAL}       {/*yylval.i_num = strtol(yytext,NULL,16);*/yylval.string = strdup(yytext);  return HEX_VAL;}
 {DECIMAL}			{/*yylval.i_num = strtol(yytext,NULL,10);*/yylval.string = strdup(yytext); return INT_VAL;}
 {FLOAT}				{/*yylval.f_num = atof(yytext);*/ yylval.string = strdup(yytext);  return FLOAT_VAL;}
 {CHAR}				{yylval.string = strdup(yytext);  return CHAR;}

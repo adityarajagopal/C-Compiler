@@ -630,6 +630,7 @@ void PrimExpr::print()
 }
 void PrimExpr::generate_code() 
 {
+	int index;
 	if(value != "")
 	{
 		if(VarTagMap[value].empty())
@@ -638,6 +639,7 @@ void PrimExpr::generate_code()
 			tag = set_offset();
 			VarTagMap[value].resize(global_scope + 1); 
 			VarTagMap[value][global_scope] = tag;
+			index = global_scope;
 		}
 		else
 		{
@@ -650,7 +652,8 @@ void PrimExpr::generate_code()
 				{
 					if(!VarTagMap[value][i].empty())
 					{
-						tag = VarTagMap[value][i]; 
+						tag = VarTagMap[value][i];
+						index = i;
 						break;
 					}
 				}
@@ -673,19 +676,22 @@ void PrimExpr::generate_code()
  		switch(flag)
 		{
 			case 1:
-				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
-				os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl; 
-				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
+				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
+				os << "li" << "\t$" << TMP1 << "," << std::stoi(value,NULL,10) << std::endl;
+				std::cerr << "INT_VAL: " << std::stoi(value,NULL,10) << std::endl;  
+				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 2:
-				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
-				os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
-				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
+				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
+				os << "li" << "\t$" << TMP1 << "," << std::stoi(value,NULL,8) << std::endl;  
+				std::cerr << "OCT_VAL: " << std::stoi(value,NULL,8) << std::endl;  
+				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 3: 
-				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
-				os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
-				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
+				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
+				os << "li" << "\t$" << TMP1 << "," << std::stoi(value,NULL,16) << std::endl;  
+				std::cerr << "HEX_VAL: " << std::stoi(value,NULL,16) << std::endl;  
+				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			default:
 				break;
@@ -1434,14 +1440,14 @@ void IfElseExpr::get_tag(std::string& _tag)
 %token INT FLOAT DOUBLE BOOL
 %token LONG UNSIGNED SIGNED CONST SHORT
 %token VOID STRUCT UNION CHAR TYPEDEF VOLATILE STRING
-%token IDENTIFIER INT_VAL FLOAT_VAL STRING_LIT
+%token IDENTIFIER INT_VAL FLOAT_VAL STRING_LIT OCT_VAL HEX_VAL
 %token IF ELSE FOR WHILE
 %token GOTO_KWD CONTINUE_KWD BREAK RETURN 
 %token EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS ADD SUB MULT DIV MOD
 %token QUESTION_MARK COLON OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT INC DEC BW_NOT NOT
 %token ENUM CHAR_KWD FLOAT_KWD DOUBLE_KWD AUTO EXTERN REGISTER STATIC DO SWITCH CASE SIZEOF DEFAULT TYPE
 %type<tree_node> jump_statement 
-%type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT TYPE CHAR STRING INT_VAL FLOAT_VAL
+%type<string> IDENTIFIER EQUALS MUL_EQUALS DIV_EQUALS MOD_EQUALS ADD_EQUALS SUB_EQUALS LEFT_EQUALS RIGHT_EQUALS AND_EQUALS OR_EQUALS XOR_EQUALS QUESTION_MARK COLON assign_oper OR AND BW_OR BW_XOR BW_AND EQUAL_EQUAL NOT_EQUAL LT GT LE GE LEFT_SHIFT RIGHT_SHIFT ADD SUB MULT DIV MOD unary_oper INC DEC BW_NOT NOT TYPE CHAR STRING INT_VAL FLOAT_VAL OCT_VAL HEX_VAL
 
 %type<File> file
 %type<Ext_Decl> external_decl
@@ -1665,10 +1671,12 @@ argument_list 	: assign_expr {$$ = new ArgList($1);}
 				;
 
 primary_expr	: IDENTIFIER {$$ = new PrimExpr($1,0);} 
-				| INT_VAL {$$ = new PrimExpr($1,1);} 
-				| FLOAT_VAL {$$ = new PrimExpr($1,2);}  
-				| CHAR {$$ = new PrimExpr($1,3);}  
-				| STRING {$$ = new PrimExpr($1,4);}  
+				| INT_VAL {$$ = new PrimExpr($1,1);}
+				| OCT_VAL {$$ = new PrimExpr($1,2);}
+				| HEX_VAL {$$ = new PrimExpr($1,3);}
+				| FLOAT_VAL {$$ = new PrimExpr($1,4);}  
+				| CHAR {$$ = new PrimExpr($1,5);}  
+				| STRING {$$ = new PrimExpr($1,6);}  
 				| LBRAC expr RBRAC {$$ = new PrimExpr("",-1,$2);}
 				;
 %%
