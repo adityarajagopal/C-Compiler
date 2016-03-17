@@ -161,7 +161,7 @@ void FuncDef::generate_code()
 	Ftr << "\t" << ".size\t" << declr->get_id(); 
 	Ftr << ", .-" << declr->get_id(); 
 	Ftr << std::endl;
-
+	
 	offset = FuncMap[declr->get_id()];
 }
 
@@ -276,11 +276,13 @@ void Declr::generate_code()
 		tag = set_offset();
 		VarTagMap[id].resize(global_scope + 1); 
 		VarTagMap[id][global_scope] = tag;
+	
+		std::cerr << "TAG: " << tag << std::endl; 
+		std::cerr << "ID: " << id << std::endl;
+		std::cerr << "Global Scope: " << global_scope << std::endl;
+		std::cerr << "vector: " << VarTagMap[id][global_scope] << std::endl; 
+		std::cerr << std::endl; 
 	}
-	std::cerr << "TAG: " << tag << std::endl; 
-	std::cerr << "ID: " << id << std::endl;
-	std::cerr << global_scope << std::endl;
-	std::cerr << std::endl; 
 
 	if(param_list != NULL){param_list->generate_code();}
 	if(declr != NULL){declr->generate_code();}
@@ -632,28 +634,34 @@ void PrimExpr::generate_code()
 	{
 		if(VarTagMap[value].empty())
 		{
+			std::cerr << "empty" << std::endl; 
 			tag = set_offset();
 			VarTagMap[value].resize(global_scope + 1); 
 			VarTagMap[value][global_scope] = tag;
 		}
 		else
 		{
+			std::cerr << "not empty" << std::endl;
+			std::cerr << global_scope << std::endl; 
+			std::cerr << VarTagMap[value].size() << std::endl;
 			for(int i=global_scope; i>=0; i--)
 			{
-				if(VarTagMap[value][i] != "")
+				if(i < VarTagMap[value].size())
 				{
-					tag = VarTagMap[value][i]; 
-					break;
+					if(!VarTagMap[value][i].empty())
+					{
+						tag = VarTagMap[value][i]; 
+						break;
+					}
 				}
 			}
 		}
-	
+		std::cerr << "TAG = " << tag << std::endl; 
+		std::cerr << "VAL = " << value << std::endl;
+		std::cerr << global_scope << std::endl;
+		std::cerr << std::endl; 
 	}
 
-	std::cerr << "TAG = " << tag << std::endl; 
-	std::cerr << "VAL = " << value << std::endl;
-	std::cerr << global_scope << std::endl;
-	std::cerr << std::endl; 
 
 	if (expr != NULL) 
 	{
@@ -661,22 +669,28 @@ void PrimExpr::generate_code()
 	}
 	else
 	{
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
+		//os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
  		switch(flag)
 		{
 			case 1:
+				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
 				os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl; 
+				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
 				break;
 			case 2:
+				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
 				os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
+				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
 				break;
 			case 3: 
+				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
 				os << "li" << "\t$" << TMP1 << "," << std::stoi(value) << std::endl;  
+				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
 				break;
 			default:
 				break;
 		}
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
+		//os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
 	}
 
 }
@@ -871,7 +885,7 @@ void Expression::generate_code()
 	}
 	if(unary_expr != NULL)
 	{
-		std::cerr << "HERE" << std::endl; 
+		std::cerr << "CALLING UNARY" << std::endl; 
 		unary_expr->generate_code();
 	}
 	if(lhs != NULL)
@@ -1111,6 +1125,7 @@ void UnaryExpr::generate_code()
 	if(unary_expr != NULL)
 	{
 		tag = set_offset(); 
+		std::cerr << "UNEXP: " << tag << std::endl; 
 		unary_expr->generate_code(); 
 		std::string rhs_tag; 
 		unary_expr->get_tag(rhs_tag);
@@ -1183,7 +1198,10 @@ void PostFixExpr::generate_code()
 	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
 	if(op != "")
 	{
-		tag = set_offset(); 
+		tag = set_offset();
+		
+		std::cerr << "PFEXPR: " << tag << std::endl; 
+
 		std::string lhs_tag; 
 		if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
 
@@ -1363,9 +1381,9 @@ void IfElseExpr::generate_code()
 	os << "lw" << "\t$" << TMP1 << "," << OffsetMap[condition_tag] << "($fp)" << std::endl; 
 	os << "lw" << "\t$" << TMP2 << "," << OffsetMap[true_tag] << "($fp)" << std::endl; 
 	os << "lw" << "\t$" << TMP3 << "," << OffsetMap[false_tag] << "($fp)" << std::endl;
-	os << "movn" << "\t$" << TMP1 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
-	os << "movz" << "\t$" << TMP1 << ",$" << TMP3 << ",$" << TMP1 << std::endl;
-	os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+	//os << "movn" << "\t$" << TMP2 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
+	os << "movz" << "\t$" << TMP2 << ",$" << TMP3 << ",$" << TMP1 << std::endl;
+	os << "sw" << "\t$" << TMP2 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 }
 void IfElseExpr::get_tag(std::string& _tag)
 {
@@ -1549,7 +1567,7 @@ expr			: assign_expr {$$ = new Expr($1);}
 				| expr COMMA assign_expr {$$ = new Expr($3,$1);}
 				;
 
-assign_expr		: conditional_expr {std::cerr << "cond_expr" << std::endl; $$ = new AssExpr($1);}
+assign_expr		: conditional_expr {$$ = new AssExpr($1);}
 				| unary_expr assign_oper assign_expr {$$ = new AssExpr(NULL,$1,$2,$3);}  
 				;
 
@@ -1566,23 +1584,23 @@ assign_oper		: EQUALS {}
 				| OR_EQUALS {}
 				;
 
-conditional_expr : logical_or_expr {std::cerr << "logor" << std::endl; $$ = new CondExpr($1);}
+conditional_expr : logical_or_expr {$$ = new CondExpr($1);}
 			     | ie_expr {$$ = new CondExpr(NULL, $1);}
 				 ;
 
 ie_expr			 : logical_or_expr QUESTION_MARK expr COLON conditional_expr {$$ = new IfElseExpr($1,$3,$5);}
 				 ;
 
-logical_or_expr : logical_and_expr {std::cerr << "logand" << std::endl; $$ = new Expression($1);}
+logical_or_expr : logical_and_expr {$$ = new Expression($1);}
 				| logical_or_expr OR logical_and_expr {$$ = new Expression($1,$3,"||");}
 				;
 
-logical_and_expr : incl_or_expr {std::cerr << "incex" << std::endl; $$ = new Expression($1);}
+logical_and_expr : incl_or_expr {$$ = new Expression($1);}
 				 | logical_and_expr AND incl_or_expr{$$ = new Expression($1,$3,"&&");}
 				 ;
 
-incl_or_expr 	: excl_or_expr{std::cerr << "fuck" << std::endl;$$ = new Expression($1);}
-				| incl_or_expr BW_OR excl_or_expr{std::cerr << "BW_OR " << yylval.string << std::endl; $$ = new Expression($3,$1,"|");} 
+incl_or_expr 	: excl_or_expr{$$ = new Expression($1);}
+				| incl_or_expr BW_OR excl_or_expr{$$ = new Expression($3,$1,"|");} 
 				;
 
 excl_or_expr	: and_expr{$$ = new Expression($1);}
