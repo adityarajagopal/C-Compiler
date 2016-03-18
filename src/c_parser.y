@@ -14,7 +14,8 @@ File* root = NULL;
 int offset = 16;
 int num_arg = 0; 
 int global_scope = 0; 
-int arg_reg = 4; 
+int arg_reg = 4;
+int loop_num = 0; 
 
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
@@ -1300,6 +1301,29 @@ void LoopStat::print()
 	{
 		std::cerr << "body:" << std::endl;
 		stat->print(); 
+	}
+}
+void LoopStat::generate_code()
+{
+	//increment loop number count
+	loop_num++; 
+	//while loop
+	if(expr_stat_1 == NULL)
+	{
+		if(expr != NULL)
+		{
+			os << "while_loop" << loop_num << ":" << std::endl; 
+			expr->generate_code(); 
+			std::string tag_condition; 
+			expr->get_tag(tag_condition); 
+			os << "lw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
+			os << "beq\t$" << TMP1 << ",$0," << "end_loop" << loop_num << std::endl;
+			os << "nop" << std::endl; 
+			if(stat != NULL) {stat->generate_code();}
+			os << "b\t" << "while_loop" << loop_num << std::endl; 
+			os << "nop" << std::endl; 
+			os << "end_loop" << loop_num << ":" << std::endl; 
+		}
 	}
 }
 

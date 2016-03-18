@@ -388,7 +388,8 @@ private:
 	DoStat* do_stat;
 public: 
 	LoopStat(ExprStat* _es1=NULL, ExprStat* _es2=NULL, Expr* _e=NULL, Stat* _s=NULL, DoStat* _ds=NULL);
-	void print(); 
+	void print();
+	void generate_code(); 
 };
 
 class DoStat : public Node
