@@ -313,6 +313,7 @@ public:
 	ExprStat(Expr* _expr=NULL);
 	void print();
 	void generate_code();
+	void get_tag(std::string& _tag);
 };
 
 class Expr : public Node
@@ -399,7 +400,8 @@ private:
 	Expr* expr; 
 public:
 	DoStat(Stat* _stat=NULL, Expr* _expr=NULL);
-	void print(); 
+	void print();
+	void generate_code(); 
 };
 
 class SelecStat : public Node
@@ -410,7 +412,8 @@ private:
 	Stat* stat_else;
 public:
 	SelecStat(Expr* _e=NULL, Stat* _si=NULL, Stat* _se=NULL); 
-	void print(); 
+	void print();
+	void generate_code();
 };
 
 #endif

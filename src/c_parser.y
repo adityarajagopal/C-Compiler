@@ -15,7 +15,8 @@ int offset = 16;
 int num_arg = 0; 
 int global_scope = 0; 
 int arg_reg = 4;
-int loop_num = 0; 
+int loop_num = 0;
+int selec_num = 0; 
 
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
@@ -830,6 +831,10 @@ void ExprStat::generate_code()
 {
 	if(expr != NULL) {expr->generate_code();}
 }
+void ExprStat::get_tag(std::string& _tag)
+{
+	if(expr != NULL) {expr->get_tag(_tag);}
+}
 
 Expression::Expression(Expression* _lhs, Expression* _rhs, std::string _op, UnaryExpr* _unary_expr) : lhs(_lhs), rhs(_rhs), op(_op), unary_expr(_unary_expr) {}
 void Expression::get_tag(std::string& _tag)
@@ -1306,25 +1311,50 @@ void LoopStat::print()
 void LoopStat::generate_code()
 {
 	//increment loop number count
-	loop_num++; 
 	//while loop
 	if(expr_stat_1 == NULL)
 	{
 		if(expr != NULL)
 		{
-			os << "while_loop" << loop_num << ":" << std::endl; 
+			loop_num++; 
+			os << "while_loop_" << loop_num << ":" << std::endl; 
 			expr->generate_code(); 
 			std::string tag_condition; 
 			expr->get_tag(tag_condition); 
 			os << "lw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
-			os << "beq\t$" << TMP1 << ",$0," << "end_loop" << loop_num << std::endl;
+			os << "beq\t$" << TMP1 << ",$0," << "end_loop_" << loop_num << std::endl;
 			os << "nop" << std::endl; 
 			if(stat != NULL) {stat->generate_code();}
-			os << "b\t" << "while_loop" << loop_num << std::endl; 
+			os << "b\t" << "while_loop_" << loop_num << std::endl; 
 			os << "nop" << std::endl; 
-			os << "end_loop" << loop_num << ":" << std::endl; 
+			os << "end_loop_" << loop_num << ":" << std::endl; 
 		}
 	}
+	//for loops
+	else
+	{
+		loop_num++; 
+		expr_stat_1->generate_code();
+		os << "for_loop_" << loop_num << ":" << std::endl; 
+		if(expr_stat_2 != NULL) {expr_stat_2->generate_code();}
+		std::string tag_condition; 
+		expr_stat_2->get_tag(tag_condition); 
+		os << "lw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
+		os << "beq\t$" << TMP1 << ",$0," << "end_loop_" << loop_num << std::endl;
+		os << "nop" << std::endl;
+		if(stat != NULL){stat->generate_code();}
+		if(expr != NULL){expr->generate_code();}
+		os << "b\t" << "for_loop_" << loop_num << std::endl;
+		os << "nop" << std::endl; 
+		os << "end_loop_" << loop_num << ":" << std::endl; 
+	}
+	//do while loop
+	if(do_stat != NULL)
+	{
+		loop_num++;
+		do_stat->generate_code();
+	}
+	loop_num--;
 }
 
 DoStat::DoStat(Stat* _stat, Expr* _expr) : stat(_stat), expr(_expr) {}
@@ -1339,6 +1369,21 @@ void DoStat::print()
 	{
 		std::cerr << "while:" << std::endl;
 		expr->print(); 
+	}
+}
+void DoStat::generate_code()
+{
+	if(expr != NULL)
+	{
+		os << "dw_loop_" << loop_num << ":" << std::endl; 
+		if(stat != NULL) {stat->generate_code();}
+		expr->generate_code(); 
+		std::string tag_condition; 
+		expr->get_tag(tag_condition); 
+		os << "lw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
+		os << "bne\t$" << TMP1 << ",$0," << "dw_loop_" << loop_num << std::endl;
+		os << "nop" << std::endl; 
+		os << "end_loop_" << loop_num << ":" << std::endl; 
 	}
 }
 
@@ -1360,6 +1405,28 @@ void SelecStat::print()
 		std::cerr << "else:" << std::endl;
 		stat_else->print(); 
 	}
+}
+void SelecStat::generate_code()
+{
+	if(stat_if != NULL)
+	{
+		selec_num++; 
+		os << "if_" << selec_num << ":" << std::endl; 
+		if(expr != NULL){expr->generate_code();}
+		std::string tag_cond; 
+		expr->get_tag(tag_cond);
+		os << "lw\t$" << TMP1 << "," << OffsetMap[tag_cond] << "($fp)" << std::endl; 
+		os << "beq\t$" << TMP1 << ",$0," << "else_" << selec_num << std::endl;
+		os << "nop" << std::endl;
+		stat_if->generate_code();
+		os << "else_" << selec_num << ":" << std::endl; 
+	}
+	if(stat_else != NULL)
+	{
+		selec_num++;
+		stat_else->generate_code();
+	}
+	selec_num--;
 }
 
 IfElseExpr::IfElseExpr(Expression* _ic, Expr* _ie, CondExpr* _ee) : if_cond(_ic), if_expr(_ie), else_expr(_ee) {}
