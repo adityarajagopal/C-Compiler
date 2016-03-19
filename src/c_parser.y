@@ -11,12 +11,13 @@ int yyerror(const char* s);
 
 std::ofstream outfile;
 File* root = NULL;
-int offset = 16;
+int offset = 0;
 int num_arg = 0; 
 int global_scope = 0; 
 int arg_reg = 4;
 int glbl_loop_num = 0;
-int glbl_selec_num = 0; 
+int glbl_selec_num = 0;
+int num_arguments = 0; 
 
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
@@ -65,7 +66,6 @@ void File::generate_code()
 	if(file != NULL) {file->generate_code();}
 }
 
-
 ExternalDecl::ExternalDecl(FuncDef* _func_def, Decl* _decl) : func_def(_func_def), decl(_decl) {}
 void ExternalDecl::print()
 {
@@ -106,7 +106,20 @@ void FuncDef::print()
 void FuncDef::generate_code()
 {
 	FuncMap[declr->get_id()] = offset;
-	offset = 16; //need to correct this 
+
+	if(comp_stat != NULL)
+	{
+		offset=0;
+		comp_stat->get_max_arguments(offset);
+		std::cerr << "function: " << declr->get_id() << std::endl; 
+		std::cerr << "OFFSET: " << offset << std::endl; 
+		if(offset < 4) {offset = 20;}
+		else {offset = 4 + offset * 4;}
+	}
+	else
+	{
+		offset = 20;
+	}
 
 	Arguments.clear(); 
 
@@ -582,13 +595,18 @@ void AssExpr::generate_code()
 		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 }
-
 void AssExpr::get_tag(std::string& _tag)
 {
 	if(ass_oper != "") _tag = tag; 
 	else if(unary_expr != NULL && _tag == "") unary_expr->get_tag(_tag); 
 	else if(ass_expr != NULL && _tag == "") ass_expr->get_tag(_tag); 
 	else if(cond_expr != NULL && _tag == "") cond_expr->get_tag(_tag);
+}
+void AssExpr::get_max_arguments(int& _offset)
+{
+	if(cond_expr != NULL) {cond_expr->get_max_arguments(_offset);}
+	if(unary_expr != NULL) {unary_expr->get_max_arguments(_offset);}
+	if(ass_expr != NULL) {ass_expr->get_max_arguments(_offset);}
 }
 
 CondExpr::CondExpr(Expression* _expression, IfElseExpr* _ie_expr) : expression(_expression), ie_expr(_ie_expr)
@@ -616,6 +634,10 @@ void CondExpr::get_tag(std::string& _tag)
 {
 	if(ie_expr != NULL) {ie_expr->get_tag(_tag);} 
 	else if(expression != NULL && _tag == "") expression->get_tag(_tag);
+}
+void CondExpr::get_max_arguments(int& _offset)
+{
+	if(expression != NULL) {expression->get_max_arguments(_offset);}	
 }
 
 PrimExpr::PrimExpr(std::string _value, int _flag, Expr* _e) : value(_value), expr(_e), flag(_flag) {}
@@ -710,6 +732,10 @@ void PrimExpr::get_tag(std::string& _tag)
 	if(expr == NULL) {_tag = tag;}
 	if(expr != NULL) {expr->get_tag(_tag);}
 }
+std::string PrimExpr::get_id()
+{
+	return value; 
+}
 
 
 CompStat::CompStat(StatList* _stat_list, DeclList* _decl_list) : stat_list(_stat_list), decl_list(_decl_list) 
@@ -738,6 +764,10 @@ void CompStat::generate_code()
 		it->second.resize(global_scope); 
 	}
 	global_scope--;
+}
+void CompStat::get_max_arguments(int& _offset)
+{
+	if(stat_list != NULL){stat_list->get_max_arguments(_offset);}
 }
 
 
@@ -775,6 +805,13 @@ void StatList::generate_code()
 {
 	if(stat != NULL) {stat->generate_code();}
 	if(stat_list != NULL) {stat_list->generate_code();}
+}
+void StatList::get_max_arguments(int& _offset)
+{
+	int current_scope_count = 0; 
+	if(stat != NULL){stat->get_max_arguments(current_scope_count);}
+	if(current_scope_count > _offset) {_offset = current_scope_count;}
+	if(stat_list != NULL) {stat_list->get_max_arguments(_offset);}
 }
 
 /*
@@ -829,6 +866,10 @@ void JumpStat::generate_code()
 		
 	}
 }
+void JumpStat::get_max_arguments(int& _offset) 
+{
+	if(expr != NULL) {expr->get_max_arguments(_offset);}	
+}
 
 ExprStat::ExprStat(Expr* _expr) : expr(_expr) {}
 void ExprStat::print()
@@ -845,6 +886,10 @@ void ExprStat::generate_code()
 void ExprStat::get_tag(std::string& _tag)
 {
 	if(expr != NULL) {expr->get_tag(_tag);}
+}
+void ExprStat::get_max_arguments(int& _offset)
+{
+	if(expr != NULL){expr->get_max_arguments(_offset);}
 }
 
 Expression::Expression(Expression* _lhs, Expression* _rhs, std::string _op, UnaryExpr* _unary_expr) : lhs(_lhs), rhs(_rhs), op(_op), unary_expr(_unary_expr) {}
@@ -1125,6 +1170,12 @@ void Expression::generate_code()
 		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 }
+void Expression::get_max_arguments(int& _offset)
+{
+	if(lhs != NULL){lhs->get_max_arguments(_offset);}
+	if(rhs != NULL){rhs->get_max_arguments(_offset);}
+	if(unary_expr != NULL) {unary_expr->get_max_arguments(_offset);}
+}
 
 UnaryExpr::UnaryExpr(PostFixExpr* _post_fix_expr, UnaryExpr* _unary_expr, std::string _unary_op) : post_fix_expr(_post_fix_expr), unary_expr(_unary_expr), unary_op(_unary_op) {}
 void UnaryExpr::print()
@@ -1201,6 +1252,11 @@ void UnaryExpr::get_tag(std::string& _tag)
 			post_fix_expr->get_tag(_tag); 
 	}
 }
+void UnaryExpr::get_max_arguments(int& _offset)
+{
+	if(post_fix_expr != NULL) {post_fix_expr->get_max_arguments(_offset);}
+	if(unary_expr != NULL) {unary_expr->get_max_arguments(_offset);}
+}
 
 PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list) {}
 void PostFixExpr::print()
@@ -1222,6 +1278,13 @@ void PostFixExpr::generate_code()
 {
 	if(prim_expr != NULL){prim_expr->generate_code();}
 	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
+	if(arg_list != NULL) 
+	{
+		num_arguments = 0; 
+		arg_list->generate_code();
+		os << "\tjal\t" << post_fix_expr->get_id() << std::endl; 
+		os << "\tnop" << std::endl; 
+	}
 	if(op != "")
 	{
 		tag = set_offset();
@@ -1257,6 +1320,15 @@ void PostFixExpr::get_tag(std::string& _tag)
 	if(op != "") {_tag = tag;}
 	if(prim_expr != NULL) {prim_expr->get_tag(_tag);}
 }
+void PostFixExpr::get_max_arguments(int& _offset)
+{
+	if(arg_list != NULL) {arg_list->get_max_arguments(_offset);}
+}
+std::string PostFixExpr::get_id() 
+{
+	if(post_fix_expr != NULL) {return post_fix_expr->get_id();}
+	if(prim_expr != NULL) {return prim_expr->get_id();}
+}
 
 ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), arg_list(_arg_list)
 {
@@ -1274,6 +1346,29 @@ ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), 
 		num_arg=0; 
 	}
 */
+}
+void ArgList::generate_code()
+{
+	if(ass_expr != NULL) 
+	{
+		ass_expr->generate_code(); 
+		std::string ass_tag; 
+		ass_expr->get_tag(ass_tag);
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[ass_tag] << "($fp)" << std::endl; 
+		if(num_arguments < 4)
+		{
+			os << "\tmove\t$a" << num_arguments << ",$" << TMP1 << std::endl; 
+		}
+		os << "\tsw\t$" << TMP1 << "," << num_arguments*4 << "($fp)" << std::endl;
+
+		num_arguments++; 
+	}
+	if(arg_list != NULL){arg_list->generate_code();}
+}
+void ArgList::get_max_arguments(int& _offset)
+{
+	if(arg_list != NULL){arg_list->get_max_arguments(_offset);}
+	if(ass_expr != NULL) {_offset++;}
 }
 
 Expr::Expr(AssExpr* _ass_expr, Expr* _expr) : ass_expr(_ass_expr), expr(_expr) {}
@@ -1298,6 +1393,11 @@ void Expr::get_tag(std::string& _tag)
 {
 	if(ass_expr != NULL) ass_expr->get_tag(_tag);
 	if(expr != NULL) expr->get_tag(_tag); 
+}
+void Expr::get_max_arguments(int& _offset)
+{
+	if(ass_expr != NULL) {ass_expr->get_max_arguments(_offset);}
+	if(expr != NULL) {expr->get_max_arguments(_offset);}
 }
 
 LoopStat::LoopStat(ExprStat* _es1, ExprStat* _es2, Expr* _e, Stat* _s, DoStat* _ds) : expr_stat_1(_es1), expr_stat_2(_es2), expr(_e), stat(_s), do_stat(_ds) {}
@@ -1377,6 +1477,7 @@ void LoopStat::generate_code()
 	}
 	loop_num--;
 }
+void LoopStat::get_max_arguments(int& _offset) {}
 
 DoStat::DoStat(Stat* _stat, Expr* _expr) : stat(_stat), expr(_expr) {}
 void DoStat::print() 
@@ -1454,6 +1555,7 @@ void SelecStat::generate_code()
 	os << "if_out_" << selec_num << ":" << std::endl; 
 	selec_num--;
 }
+void SelecStat::get_max_arguments(int& _offset) {}
 
 IfElseExpr::IfElseExpr(Expression* _ic, Expr* _ie, CondExpr* _ee) : if_cond(_ic), if_expr(_ie), else_expr(_ee) {}
 void IfElseExpr::print()
