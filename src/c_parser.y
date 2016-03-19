@@ -732,6 +732,11 @@ void CompStat::generate_code()
 	global_scope++;
 	if(decl_list != NULL){decl_list->generate_code();}
 	if(stat_list != NULL){stat_list->generate_code();}
+	//resize all vectors everytime we exit a scope so that past variables in deepr scopes aren't kept
+	for(std::map<Tag,std::vector<Tag> >::iterator it = VarTagMap.begin(); it != VarTagMap.end(); ++it)
+	{
+		it->second.resize(global_scope); 
+	}
 	global_scope--;
 }
 
@@ -1437,6 +1442,7 @@ void SelecStat::generate_code()
 		os << "\tbeq\t$" << TMP1 << ",$0," << "else_" << selec_num << std::endl;
 		os << "\tnop" << std::endl;
 		stat_if->generate_code();
+		os << "\tb\t" << "if_out_" << selec_num << std::endl; 
 		os << "else_" << selec_num << ":" << std::endl; 
 	}
 	if(stat_else != NULL)
@@ -1445,6 +1451,7 @@ void SelecStat::generate_code()
 		//glbl_selec_num++;
 		stat_else->generate_code();
 	}
+	os << "if_out_" << selec_num << ":" << std::endl; 
 	selec_num--;
 }
 
