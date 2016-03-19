@@ -1,4 +1,4 @@
-%define parse.error verbose
+
 %{
 #include "src/c_parser.h"
 
@@ -15,8 +15,8 @@ int offset = 16;
 int num_arg = 0; 
 int global_scope = 0; 
 int arg_reg = 4;
-int loop_num = 0;
-int selec_num = 0; 
+int glbl_loop_num = 0;
+int glbl_selec_num = 0; 
 
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
@@ -137,26 +137,26 @@ void FuncDef::generate_code()
 	{
 		if(i<4)
 		{
-			FuncInit << "sw\t$a" << i << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 
+			FuncInit << "\tsw\t$a" << i << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 
 		}
 		else
 		{
-			FuncInit << "lw\t$" << TMP1 << "," << offset+(i*4) << "($fp)" << std::endl; 
-			FuncInit << "sw\t$" << TMP1 << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 	
+			FuncInit << "\tlw\t$" << TMP1 << "," << offset+(i*4) << "($fp)" << std::endl; 
+			FuncInit << "\tsw\t$" << TMP1 << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 	
 		}
 	}
 
-	SetupFp << "addiu\t$sp,$sp,-" << offset+12 << std::endl;
-	SetupFp << "sw\t$fp," << offset+4 << "($sp)" << std::endl;
-	SetupFp << "sw\t$31," << offset+8 << "($sp)" << std::endl;
-	SetupFp << "move\t$fp,$sp" << std::endl;
+	SetupFp << "\taddiu\t$sp,$sp,-" << offset+12 << std::endl;
+	SetupFp << "\tsw\t$fp," << offset+4 << "($sp)" << std::endl;
+	SetupFp << "\tsw\t$31," << offset+8 << "($sp)" << std::endl;
+	SetupFp << "\tmove\t$fp,$sp" << std::endl;
 
-	RestoreFp << "move\t$sp,$fp" << std::endl; 
-	RestoreFp << "lw\t$fp," << offset+4 << "($sp)" << std::endl; 
-	RestoreFp << "lw\t$31," << offset+8 << "($sp)" << std::endl;
-	RestoreFp << "addiu\t$sp,$sp," << offset+12 << std::endl; 
-	RestoreFp << "j\t" << "$31" << std::endl;
-	RestoreFp << "nop" << std::endl; 
+	RestoreFp << "\tmove\t$sp,$fp" << std::endl; 
+	RestoreFp << "\tlw\t$fp," << offset+4 << "($sp)" << std::endl; 
+	RestoreFp << "\tlw\t$31," << offset+8 << "($sp)" << std::endl;
+	RestoreFp << "\taddiu\t$sp,$sp," << offset+12 << std::endl; 
+	RestoreFp << "\tj\t" << "$31" << std::endl;
+	RestoreFp << "\tnop" << std::endl; 
 
 	Ftr << "\t" << ".end\t" << declr->get_id(); 
 	Ftr << std::endl; 
@@ -247,8 +247,8 @@ void InitDeclr::generate_code()
 	{
 		if(declr != NULL) declr->get_tag(lhs_tag); 
 		init_val->get_tag(rhs_tag); 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
 	}
 }
 
@@ -361,9 +361,9 @@ void ParamDecl::generate_code()
 		declr->generate_code();
 		std::string d_tag; 
 		declr->get_tag(d_tag); 
-		os << "lw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
 		os << "move\t$" << TMP1 << ",$" << arg_reg << std::endl; 
-		os << "sw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
+		os << "\tsw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
 		
 		arg_reg++; 
 		*/
@@ -439,11 +439,11 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "add" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	if(ass_oper == "=")
@@ -453,9 +453,9 @@ void AssExpr::generate_code()
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
 		
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	
@@ -465,11 +465,11 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "sub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	else if(ass_oper == "*=")
@@ -478,13 +478,13 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "mul" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "nop" << std::endl; 
-		os << "nop" << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tmul" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tnop" << std::endl; 
+		os << "\tnop" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	else if(ass_oper == "/=")
@@ -493,13 +493,13 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "div" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "nop" << std::endl;
-		os << "nop" << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tdiv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tnop" << std::endl;
+		os << "\tnop" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "%=")
@@ -508,13 +508,13 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "rem" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "nop" << std::endl; 
-		os << "nop" << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\trem" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tnop" << std::endl; 
+		os << "\tnop" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "<<=")
@@ -523,11 +523,11 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "sllv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tsllv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == ">>=")
@@ -536,11 +536,11 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "srav" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tsrav" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "&=")
@@ -549,11 +549,11 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "and" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tand" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "^=")
@@ -562,11 +562,11 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "xor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\txor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	else if(ass_oper == "|=")
@@ -575,11 +575,11 @@ void AssExpr::generate_code()
 		rhs_tag="";
 		unary_expr->get_tag(lhs_tag);
 		ass_expr->get_tag(rhs_tag);
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "or" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+		os << "\tor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 }
 
@@ -632,7 +632,7 @@ void PrimExpr::print()
 }
 void PrimExpr::generate_code() 
 {
-	int index;
+	int index = -1;
 	if(value != "")
 	{
 		if(VarTagMap[value].empty())
@@ -660,6 +660,12 @@ void PrimExpr::generate_code()
 					}
 				}
 			}
+			if(index == -1)
+			{
+				tag = set_offset(); 
+				VarTagMap[value][global_scope] = tag; 
+				index = global_scope; 
+			}
 		}
 		std::cerr << "TAG = " << tag << std::endl; 
 		std::cerr << "VAL = " << value << std::endl;
@@ -674,28 +680,28 @@ void PrimExpr::generate_code()
 	}
 	else
 	{
-		//os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
+		//os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl; 
  		switch(flag)
 		{
 			case 1:
-				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
-				os << "li" << "\t$" << TMP1 << "," << std::stoi(value,NULL,10) << std::endl;
-				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
+				os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
+				os << "\tli" << "\t$" << TMP1 << "," << std::stoi(value,NULL,10) << std::endl;
+				os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 2:
-				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
-				os << "li" << "\t$" << TMP1 << "," << std::stoi(value,NULL,8) << std::endl;  
-				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
+				os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
+				os << "\tli" << "\t$" << TMP1 << "," << std::stoi(value,NULL,8) << std::endl;  
+				os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 3: 
-				os << "lw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
-				os << "li" << "\t$" << TMP1 << "," << std::stoi(value,NULL,16) << std::endl;  
-				os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
+				os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
+				os << "\tli" << "\t$" << TMP1 << "," << std::stoi(value,NULL,16) << std::endl;  
+				os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			default:
 				break;
 		}
-		//os << "sw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
+		//os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][global_scope]] << "($fp)" << std::endl;
 	}
 
 }
@@ -806,7 +812,7 @@ void JumpStat::generate_code()
 		if(expr != NULL)
 		{
 			expr->generate_code();
-			os << "lw\t"<< "$2,";
+			os << "\tlw\t"<< "$2,";
 			std::string return_tag; 
 			expr->get_tag(return_tag); 
 			os << OffsetMap[return_tag] << "($fp)" << std::endl; 
@@ -907,10 +913,10 @@ void Expression::generate_code()
 		if(lhs != NULL) lhs->get_tag(tag_lhs);
 		if(rhs != NULL) rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "add" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		
 	}
 
@@ -919,10 +925,10 @@ void Expression::generate_code()
 		if(lhs != NULL)	lhs->get_tag(tag_lhs);
 		if(rhs != NULL)	rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "sub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "*")
@@ -930,11 +936,13 @@ void Expression::generate_code()
 		if(lhs != NULL) lhs->get_tag(tag_lhs);
 		if(unary_expr != NULL) unary_expr->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "mult" << "\t$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "mflo" << "\t$" << TMP1 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tmult" << "\t$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tmflo" << "\t$" << TMP1 << std::endl;
+		os << "\tnop" << std::endl; 
+		os << "\tnop" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "/")
@@ -942,11 +950,13 @@ void Expression::generate_code()
 		if(lhs != NULL) lhs->get_tag(tag_lhs);
 		if(unary_expr != NULL) unary_expr->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "div" << "\t$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "mflo" << "\t$" << TMP1 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tdiv" << "\t$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tmflo" << "\t$" << TMP1 << std::endl;
+		os << "\tnop" << std::endl; 
+		os << "\tnop" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	if(op == "%")
@@ -954,11 +964,13 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		unary_expr->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "div" << "\t$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "mfhi" << "\t$" << TMP1 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tdiv" << "\t$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tmfhi" << "\t$" << TMP1 << std::endl;
+		os << "\tnop" << std::endl; 
+		os << "\tnop" << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "<<")
@@ -966,10 +978,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "sllv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsllv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == ">>")
@@ -977,10 +989,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "srav" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsrav" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "<")
@@ -988,10 +1000,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "slt" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tslt" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	if(op == ">")
@@ -999,10 +1011,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "sgt" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsgt" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "<=")
@@ -1010,10 +1022,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "sge" << "\t$" << TMP1 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsge" << "\t$" << TMP1 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == ">=")
@@ -1021,10 +1033,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "sge" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsge" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "==")
@@ -1032,10 +1044,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "seq" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tseq" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	if(op == "!=")
@@ -1043,10 +1055,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "sne" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsne" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 	
 	if(op == "&")
@@ -1054,10 +1066,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "and" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tand" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "^")
@@ -1065,10 +1077,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "xor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\txor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "|")
@@ -1076,10 +1088,10 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "or" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "&&")
@@ -1087,12 +1099,12 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "sne" << "\t$" << TMP1 << ",$" << TMP1 << ",0" << std::endl; 
-		os << "sne" << "\t$" << TMP2 << ",$" << TMP2 << ",0" << std::endl;
-		os << "and" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsne" << "\t$" << TMP1 << ",$" << TMP1 << ",0" << std::endl; 
+		os << "\tsne" << "\t$" << TMP2 << ",$" << TMP2 << ",0" << std::endl;
+		os << "\tand" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "||")
@@ -1100,12 +1112,12 @@ void Expression::generate_code()
 		lhs->get_tag(tag_lhs);
 		rhs->get_tag(tag_rhs);
 
-		os << "lw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "lw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "sne" << "\t$" << TMP1 << ",$" << TMP1 << ",0" << std::endl; 
-		os << "sne" << "\t$" << TMP2 << ",$" << TMP2 << ",0" << std::endl;
-		os << "or" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl;
-		os << "sw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsne" << "\t$" << TMP1 << ",$" << TMP1 << ",0" << std::endl; 
+		os << "\tsne" << "\t$" << TMP2 << ",$" << TMP2 << ",0" << std::endl;
+		os << "\tor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl;
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 }
 
@@ -1141,37 +1153,37 @@ void UnaryExpr::generate_code()
 
 		if(unary_op == "++")
 		{
-			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
-			os << "sw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
-			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
 		}
 		if(unary_op == "--")
 		{
-			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
-			os << "sw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
-			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
 		}
 		if(unary_op == "-")
 		{
-			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
-			os << "neg\t$" << TMP1 << ",$" << TMP1 << std::endl;
-			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+			os << "\tneg\t$" << TMP1 << ",$" << TMP1 << std::endl;
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
 		if(unary_op == "~")
 		{
-			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
-			os << "not\t$" << TMP1 << ",$" << TMP1 << std::endl;
-			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+			os << "\tnot\t$" << TMP1 << ",$" << TMP1 << std::endl;
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
 		if(unary_op == "!")
 		{
-			os << "lw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
-			os << "movn\t$" << TMP3 << ",$0,$" << TMP1 << std::endl;
-			os << "li\t$" << TMP2 << ",1" << std::endl; 
-			os << "movz\t$" << TMP3 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
-			os << "sw\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+			os << "\tmovn\t$" << TMP3 << ",$0,$" << TMP1 << std::endl;
+			os << "\tli\t$" << TMP2 << ",1" << std::endl; 
+			os << "\tmovz\t$" << TMP3 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
+			os << "\tsw\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
 	}
 }
@@ -1221,17 +1233,17 @@ void PostFixExpr::generate_code()
 
 		if(op == "++")
 		{
-			os << "lw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
-			os << "sw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
 		}
 		if(op == "--")
 		{
-			os << "lw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-			os << "sw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-			os << "addi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
-			os << "sw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
 		}
 	}
 }
@@ -1274,8 +1286,8 @@ void Expr::print()
 }
 void Expr::generate_code()
 {
-	if(ass_expr != NULL) {ass_expr->generate_code();}
 	if(expr != NULL) {expr->generate_code();}
+	if(ass_expr != NULL) {ass_expr->generate_code();}
 }
 void Expr::get_tag(std::string& _tag)
 {
@@ -1304,54 +1316,58 @@ void LoopStat::print()
 	}
 	if(stat != NULL)
 	{
-		std::cerr << "body:" << std::endl;
+		std::cerr << "\tbody:" << std::endl;
 		stat->print(); 
 	}
 }
 void LoopStat::generate_code()
 {
 	//increment loop number count
+	int loop_num = glbl_loop_num; 
 	//while loop
 	if(expr_stat_1 == NULL)
 	{
 		if(expr != NULL)
 		{
-			loop_num++; 
+			loop_num++;
+			glbl_loop_num++;
 			os << "while_loop_" << loop_num << ":" << std::endl; 
 			expr->generate_code(); 
 			std::string tag_condition; 
 			expr->get_tag(tag_condition); 
-			os << "lw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
-			os << "beq\t$" << TMP1 << ",$0," << "end_loop_" << loop_num << std::endl;
-			os << "nop" << std::endl; 
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
+			os << "\tbeq\t$" << TMP1 << ",$0," << "end_loop_" << loop_num << std::endl;
+			os << "\tnop" << std::endl; 
 			if(stat != NULL) {stat->generate_code();}
-			os << "b\t" << "while_loop_" << loop_num << std::endl; 
-			os << "nop" << std::endl; 
+			os << "\tb\t" << "while_loop_" << loop_num << std::endl; 
+			os << "\tnop" << std::endl; 
 			os << "end_loop_" << loop_num << ":" << std::endl; 
 		}
 	}
 	//for loops
 	else
 	{
-		loop_num++; 
+		loop_num++;
+		glbl_loop_num++;
 		expr_stat_1->generate_code();
 		os << "for_loop_" << loop_num << ":" << std::endl; 
 		if(expr_stat_2 != NULL) {expr_stat_2->generate_code();}
-		std::string tag_condition; 
-		expr_stat_2->get_tag(tag_condition); 
-		os << "lw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
-		os << "beq\t$" << TMP1 << ",$0," << "end_loop_" << loop_num << std::endl;
-		os << "nop" << std::endl;
+		std::string tag_condition = ""; 
+		expr_stat_2->get_tag(tag_condition);
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
+		os << "\tbeq\t$" << TMP1 << ",$0," << "end_loop_" << loop_num << std::endl;
+		os << "\tnop" << std::endl;
 		if(stat != NULL){stat->generate_code();}
 		if(expr != NULL){expr->generate_code();}
-		os << "b\t" << "for_loop_" << loop_num << std::endl;
-		os << "nop" << std::endl; 
+		os << "\tb\t" << "for_loop_" << loop_num << std::endl;
+		os << "\tnop" << std::endl; 
 		os << "end_loop_" << loop_num << ":" << std::endl; 
 	}
 	//do while loop
 	if(do_stat != NULL)
 	{
 		loop_num++;
+		glbl_loop_num++;
 		do_stat->generate_code();
 	}
 	loop_num--;
@@ -1375,15 +1391,15 @@ void DoStat::generate_code()
 {
 	if(expr != NULL)
 	{
-		os << "dw_loop_" << loop_num << ":" << std::endl; 
+		os << "dw_loop_" << glbl_loop_num << ":" << std::endl; 
 		if(stat != NULL) {stat->generate_code();}
 		expr->generate_code(); 
 		std::string tag_condition; 
 		expr->get_tag(tag_condition); 
-		os << "lw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
-		os << "bne\t$" << TMP1 << ",$0," << "dw_loop_" << loop_num << std::endl;
-		os << "nop" << std::endl; 
-		os << "end_loop_" << loop_num << ":" << std::endl; 
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[tag_condition] << "($fp)" << std::endl; 
+		os << "\tbne\t$" << TMP1 << ",$0," << "dw_loop_" << glbl_loop_num << std::endl;
+		os << "\tnop" << std::endl; 
+		//os << "end_loop_" << glbl_loop_num << ":" << std::endl; 
 	}
 }
 
@@ -1397,7 +1413,7 @@ void SelecStat::print()
 	}
 	if(stat_if != NULL)
 	{
-		std::cerr << "body:" << std::endl; 
+		std::cerr << "\tbody:" << std::endl; 
 		stat_if->print(); 
 	}
 	if(stat_else != NULL)
@@ -1408,22 +1424,25 @@ void SelecStat::print()
 }
 void SelecStat::generate_code()
 {
+	int selec_num = glbl_selec_num; 
 	if(stat_if != NULL)
 	{
 		selec_num++; 
+		glbl_selec_num++;
 		os << "if_" << selec_num << ":" << std::endl; 
 		if(expr != NULL){expr->generate_code();}
 		std::string tag_cond; 
 		expr->get_tag(tag_cond);
-		os << "lw\t$" << TMP1 << "," << OffsetMap[tag_cond] << "($fp)" << std::endl; 
-		os << "beq\t$" << TMP1 << ",$0," << "else_" << selec_num << std::endl;
-		os << "nop" << std::endl;
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[tag_cond] << "($fp)" << std::endl; 
+		os << "\tbeq\t$" << TMP1 << ",$0," << "else_" << selec_num << std::endl;
+		os << "\tnop" << std::endl;
 		stat_if->generate_code();
 		os << "else_" << selec_num << ":" << std::endl; 
 	}
 	if(stat_else != NULL)
 	{
-		selec_num++;
+		//selec_num++;
+		//glbl_selec_num++;
 		stat_else->generate_code();
 	}
 	selec_num--;
@@ -1439,7 +1458,7 @@ void IfElseExpr::print()
 	}
 	if(if_expr != NULL)
 	{
-		std::cerr << "body: "; 
+		std::cerr << "\tbody: "; 
 		if_expr->print(); 
 	}
 	if(else_expr != NULL)
@@ -1472,12 +1491,12 @@ void IfElseExpr::generate_code()
 		else_expr->get_tag(false_tag);
 	}
 
-	os << "lw" << "\t$" << TMP1 << "," << OffsetMap[condition_tag] << "($fp)" << std::endl; 
-	os << "lw" << "\t$" << TMP2 << "," << OffsetMap[true_tag] << "($fp)" << std::endl; 
-	os << "lw" << "\t$" << TMP3 << "," << OffsetMap[false_tag] << "($fp)" << std::endl;
-	//os << "movn" << "\t$" << TMP2 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
-	os << "movz" << "\t$" << TMP2 << ",$" << TMP3 << ",$" << TMP1 << std::endl;
-	os << "sw" << "\t$" << TMP2 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+	os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[condition_tag] << "($fp)" << std::endl; 
+	os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[true_tag] << "($fp)" << std::endl; 
+	os << "\tlw" << "\t$" << TMP3 << "," << OffsetMap[false_tag] << "($fp)" << std::endl;
+	//os << "\tmovn" << "\t$" << TMP2 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
+	os << "\tmovz" << "\t$" << TMP2 << ",$" << TMP3 << ",$" << TMP1 << std::endl;
+	os << "\tsw" << "\t$" << TMP2 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 }
 void IfElseExpr::get_tag(std::string& _tag)
 {
