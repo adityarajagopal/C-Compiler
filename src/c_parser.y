@@ -18,8 +18,7 @@ int arg_reg = 4;
 int glbl_loop_num = 0;
 int glbl_selec_num = 0;
 int num_arguments = 0;
-int is_func_dec = 0; 
-
+int num_parameters = 0;
 
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
@@ -62,7 +61,8 @@ void File::generate_code()
 	
 	Hdr.str(""); 
 	SetupFp.str("");
-	os.str(""); 
+	os.str("");
+	FuncInit.str("");
 	RestoreFp.str(""); 
 	Ftr.str(""); 
 	
@@ -114,8 +114,7 @@ void FuncDef::generate_code()
 	{
 		offset=0;
 		comp_stat->get_max_arguments(offset);
-		std::cerr << "function: " << declr->get_id() << std::endl; 
-		std::cerr << "OFFSET: " << offset << std::endl; 
+		std::cerr << "ARGUMETNS: " << offset << std::endl; 
 		if(offset < 4) {offset = 16;}
 		else {offset = offset * 4;}
 	}
@@ -123,7 +122,6 @@ void FuncDef::generate_code()
 	{
 		offset = 16;
 	}
-
 
 	Hdr << "\t" << ".align\t2" << std::endl; 
 	Hdr << "\t" << ".globl\t" << declr->get_id();
@@ -134,18 +132,21 @@ void FuncDef::generate_code()
 	Hdr << declr->get_id();  
 	Hdr << ":" << std::endl;
 
+	Arguments.clear();
+	
 	if(declr != NULL)
 	{
 		global_scope++;
 		declr->generate_code(); 
 		global_scope--;
 	}
-	
+
 	if(comp_stat != NULL)
 	{
 		comp_stat->generate_code();
 	}
 	
+	offset+=12; //accounting for frame pointer and return address 
 	for(int i=0; i<Arguments.size(); i++)
 	{
 		if(i<4)
@@ -158,17 +159,16 @@ void FuncDef::generate_code()
 			FuncInit << "\tsw\t$" << TMP1 << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 	
 		}
 	}
-	Arguments.clear(); 
 
-	SetupFp << "\taddiu\t$sp,$sp,-" << offset+12 << std::endl;
-	SetupFp << "\tsw\t$fp," << offset+4 << "($sp)" << std::endl;
-	SetupFp << "\tsw\t$31," << offset+8 << "($sp)" << std::endl;
+	SetupFp << "\taddiu\t$sp,$sp,-" << offset << std::endl;
+	SetupFp << "\tsw\t$fp," << offset-8 << "($sp)" << std::endl;
+	SetupFp << "\tsw\t$31," << offset-4 << "($sp)" << std::endl;
 	SetupFp << "\tmove\t$fp,$sp" << std::endl;
 
 	RestoreFp << "\tmove\t$sp,$fp" << std::endl; 
-	RestoreFp << "\tlw\t$fp," << offset+4 << "($sp)" << std::endl; 
-	RestoreFp << "\tlw\t$31," << offset+8 << "($sp)" << std::endl;
-	RestoreFp << "\taddiu\t$sp,$sp," << offset+12 << std::endl; 
+	RestoreFp << "\tlw\t$fp," << offset-8 << "($sp)" << std::endl; 
+	RestoreFp << "\tlw\t$31," << offset-4 << "($sp)" << std::endl;
+	RestoreFp << "\taddiu\t$sp,$sp," << offset << std::endl; 
 	RestoreFp << "\tj\t" << "$31" << std::endl;
 	RestoreFp << "\tnop" << std::endl; 
 
@@ -197,10 +197,10 @@ void Decl::print()
 }
 void Decl::generate_code()
 {
+	//is_func_dec = 1;
 	if(init_list != NULL)
 	{
 		init_list->generate_code();
-		is_func_dec = 1;
 	}
 }
 
@@ -292,8 +292,7 @@ void Declr::print()
 }
 void Declr::generate_code()
 {
-	if(param_list != NULL && is_func_dec == 0){param_list->generate_code();}
-	else {is_func_dec = 0;}
+	if(param_list != NULL){param_list->generate_code();}
 	
 	if(id != "")
 	{
@@ -308,7 +307,7 @@ void Declr::generate_code()
 		std::cerr << std::endl; 
 	}
 
-	if(declr != NULL && func_dec == 0){declr->generate_code();}
+	if(declr != NULL){declr->generate_code();}
 }
 std::string Declr::get_id()
 {
@@ -353,7 +352,7 @@ void ParamList::print()
 }
 void ParamList::generate_code()
 {
-	if(param_decl != NULL) {param_decl->generate_code();}
+	if(param_decl != NULL) {param_decl->generate_code(); num_parameters++;}
 	if(param_list != NULL) {param_list->generate_code();}
 }
 void ParamList::get_tag(std::string& _tag)
@@ -378,16 +377,6 @@ void ParamDecl::generate_code()
 {
 	if(declr != NULL) 
 	{
-		/*
-		declr->generate_code();
-		std::string d_tag; 
-		declr->get_tag(d_tag); 
-		os << "\tlw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
-		os << "move\t$" << TMP1 << ",$" << arg_reg << std::endl; 
-		os << "\tsw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
-		
-		arg_reg++; 
-		*/
 		declr->generate_code(); 
 		std::string d_tag;
 		declr->get_tag(d_tag);
@@ -399,10 +388,7 @@ void ParamDecl::get_tag(std::string& _tag)
 	if(declr != NULL) {declr->get_tag(_tag);}
 }
 
-AssExpr::AssExpr(CondExpr* _cond_expr, UnaryExpr* _unary_expr, std::string _ass_oper, AssExpr* _ass_expr) : cond_expr(_cond_expr), unary_expr(_unary_expr), ass_oper(_ass_oper), ass_expr(_ass_expr) 
-{
-	/*if(ass_oper != "") {tag = set_offset();}*/
-}
+AssExpr::AssExpr(CondExpr* _cond_expr, UnaryExpr* _unary_expr, std::string _ass_oper, AssExpr* _ass_expr) : cond_expr(_cond_expr), unary_expr(_unary_expr), ass_oper(_ass_oper), ass_expr(_ass_expr) {}
 void AssExpr::print()
 {
 	if(cond_expr != NULL)
@@ -612,9 +598,44 @@ void AssExpr::get_tag(std::string& _tag)
 }
 void AssExpr::get_max_arguments(int& _offset)
 {
-	if(cond_expr != NULL) {cond_expr->get_max_arguments(_offset);}
-	if(unary_expr != NULL) {unary_expr->get_max_arguments(_offset);}
-	if(ass_expr != NULL) {ass_expr->get_max_arguments(_offset);}
+	int ce=0, ue=0, ae=0; 
+	std::vector<int> tmp; 
+	if(cond_expr != NULL) 
+	{
+		cond_expr->get_max_arguments(ce);
+		tmp.push_back(ce); 
+	}
+	if(unary_expr != NULL) 
+	{
+		unary_expr->get_max_arguments(ue);
+		tmp.push_back(ue); 
+	}
+	if(ass_expr != NULL) 
+	{
+		ass_expr->get_max_arguments(ae);
+		tmp.push_back(ae); 
+	}
+	
+	if(!tmp.empty())
+	{
+		std::vector<int>::iterator i1; 
+		i1 = std::max_element(tmp.begin(), tmp.end());
+		std::cerr << "MAX1: " << *i1 << std::endl; 
+		_offset = *i1;
+		/*
+		int max = tmp[0]; 
+		for(int i=0; i<tmp.size(); i++)
+		{
+			std::cerr << tmp[i] << std::endl; 
+			if(tmp[i] > max) 
+			{
+				max = tmp[i]; 
+			}
+		}
+		std::cerr << "MAX1: " << max << std::endl; 
+		_offset = max;
+		*/
+	}
 }
 
 CondExpr::CondExpr(Expression* _expression, IfElseExpr* _ie_expr) : expression(_expression), ie_expr(_ie_expr)
@@ -1180,9 +1201,44 @@ void Expression::generate_code()
 }
 void Expression::get_max_arguments(int& _offset)
 {
-	if(lhs != NULL){lhs->get_max_arguments(_offset);}
-	if(rhs != NULL){rhs->get_max_arguments(_offset);}
-	if(unary_expr != NULL) {unary_expr->get_max_arguments(_offset);}
+	int l=0, r=0, ue=0; 
+	std::vector<int> tmp; 
+	if(lhs != NULL)
+	{
+		lhs->get_max_arguments(l);
+		tmp.push_back(l); 
+	}
+	if(rhs != NULL)
+	{
+		rhs->get_max_arguments(r);
+		tmp.push_back(r); 
+	}
+	if(unary_expr != NULL) 
+	{
+		unary_expr->get_max_arguments(ue);
+		tmp.push_back(ue); 
+	}
+	
+	if(!tmp.empty())
+	{
+		std::vector<int>::iterator i1; 
+		i1 = std::max_element(tmp.begin(), tmp.end());
+		std::cerr << "MAX2: " << *i1 << std::endl; 
+		_offset = *i1;
+		/*
+		int max = tmp[0]; 
+		for(int i=0; i<tmp.size(); i++)
+		{
+			std::cerr << tmp[i] << std::endl; 
+			if(tmp[i] > max) 
+			{
+				max = tmp[i]; 
+			}
+		}
+		std::cerr << "MAX2: " << max << std::endl; 
+		_offset = max;
+		*/
+	}
 }
 
 UnaryExpr::UnaryExpr(PostFixExpr* _post_fix_expr, UnaryExpr* _unary_expr, std::string _unary_op) : post_fix_expr(_post_fix_expr), unary_expr(_unary_expr), unary_op(_unary_op) {}
@@ -1262,8 +1318,12 @@ void UnaryExpr::get_tag(std::string& _tag)
 }
 void UnaryExpr::get_max_arguments(int& _offset)
 {
-	if(post_fix_expr != NULL) {post_fix_expr->get_max_arguments(_offset);}
-	if(unary_expr != NULL) {unary_expr->get_max_arguments(_offset);}
+	int pe=0, ue=0;
+	if(post_fix_expr != NULL) {post_fix_expr->get_max_arguments(pe);}
+	if(unary_expr != NULL) {unary_expr->get_max_arguments(ue);}
+
+	if(pe > ue) {_offset = pe;}
+	else {_offset = ue;}
 }
 
 PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list) {}
@@ -1413,8 +1473,12 @@ void Expr::get_tag(std::string& _tag)
 }
 void Expr::get_max_arguments(int& _offset)
 {
-	if(ass_expr != NULL) {ass_expr->get_max_arguments(_offset);}
-	if(expr != NULL) {expr->get_max_arguments(_offset);}
+	int ae=0, e=0; 
+	if(ass_expr != NULL) {ass_expr->get_max_arguments(ae);}
+	if(expr != NULL) {expr->get_max_arguments(e);}
+
+	if(ae > e) {_offset = ae;}
+	else {_offset = e;}
 }
 
 LoopStat::LoopStat(ExprStat* _es1, ExprStat* _es2, Expr* _e, Stat* _s, DoStat* _ds) : expr_stat_1(_es1), expr_stat_2(_es2), expr(_e), stat(_s), do_stat(_ds) {}
@@ -1494,7 +1558,44 @@ void LoopStat::generate_code()
 	}
 	loop_num--;
 }
-void LoopStat::get_max_arguments(int& _offset) {}
+void LoopStat::get_max_arguments(int& _offset) 
+{
+	int es1=0, es2=0, e=0, s=0, ds=0; 
+	std::vector<int> tmp; 
+	if(expr_stat_1 != NULL)
+	{
+		expr_stat_1->get_max_arguments(es1);
+		tmp.push_back(es1);
+	}
+	if(expr_stat_2 != NULL)
+	{
+		expr_stat_2->get_max_arguments(es2);
+		tmp.push_back(es2);
+	}
+	if(expr != NULL)
+	{
+		expr->get_max_arguments(e);
+		tmp.push_back(e);
+	}
+	if(stat != NULL)
+	{
+		stat->get_max_arguments(s);
+		tmp.push_back(s);
+	}
+	if(do_stat != NULL)
+	{
+		do_stat->get_max_arguments(ds);
+		tmp.push_back(ds); 
+	}
+
+	if(!tmp.empty())
+	{
+		std::vector<int>::iterator i1; 
+		i1 = std::max_element(tmp.begin(), tmp.end());
+		std::cerr << "MAX3: " << *i1 << std::endl; 
+		_offset = *i1;
+	}
+}
 
 DoStat::DoStat(Stat* _stat, Expr* _expr) : stat(_stat), expr(_expr) {}
 void DoStat::print() 
@@ -1524,6 +1625,15 @@ void DoStat::generate_code()
 		os << "\tnop" << std::endl; 
 		//os << "end_loop_" << glbl_loop_num << ":" << std::endl; 
 	}
+}
+void DoStat::get_max_arguments(int& _offset)
+{
+	int s=0, e=0;
+	if(stat != NULL){stat->get_max_arguments(s);}
+	if(expr != NULL){expr->get_max_arguments(e);}
+	
+	if(s > e){_offset = s;}
+	else {_offset = e;}
 }
 
 SelecStat::SelecStat(Expr* _e, Stat* _si, Stat* _se) : expr(_e), stat_if(_si), stat_else(_se) {}
@@ -1572,7 +1682,47 @@ void SelecStat::generate_code()
 	os << "if_out_" << selec_num << ":" << std::endl; 
 	selec_num--;
 }
-void SelecStat::get_max_arguments(int& _offset) {}
+void SelecStat::get_max_arguments(int& _offset) 
+{
+	int e=0, si=0, se=0; 
+	std::vector<int> tmp; 
+	if(expr != NULL)
+	{
+		expr->get_max_arguments(e);
+		tmp.push_back(e); 
+	}
+	if(stat_if != NULL)
+	{
+		stat_if->get_max_arguments(si);
+		tmp.push_back(si);
+	}
+	if(stat_else != NULL)
+	{
+		stat_else->get_max_arguments(se);
+		tmp.push_back(se); 
+	}
+	
+	if(!tmp.empty())
+	{
+		std::vector<int>::iterator i1; 
+		i1 = std::max_element(tmp.begin(), tmp.end());
+		std::cerr << "MAX4: " << *i1 << std::endl; 
+		_offset = *i1;
+		/*
+		int max = tmp[0]; 
+		for(int i=0; i<tmp.size(); i++)
+		{
+			std::cerr << tmp[i] << std::endl; 
+			if(tmp[i] > max) 
+			{
+				max = tmp[i]; 
+			}
+		}
+		std::cerr << "MAX4: " << max << std::endl; 
+		_offset = max;
+		*/
+	}
+}
 
 IfElseExpr::IfElseExpr(Expression* _ic, Expr* _ie, CondExpr* _ee) : if_cond(_ic), if_expr(_ie), else_expr(_ee) {}
 void IfElseExpr::print()

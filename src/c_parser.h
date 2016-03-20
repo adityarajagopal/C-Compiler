@@ -1,7 +1,8 @@
 #ifndef C_PARSER_H
 #define C_PARSER_H
 
-#include <iostream> 
+#include <iostream>
+#include <algorithm>
 #include <string>
 #include <fstream> 
 #include <sstream>
@@ -418,7 +419,8 @@ private:
 public:
 	DoStat(Stat* _stat=NULL, Expr* _expr=NULL);
 	void print();
-	void generate_code(); 
+	void generate_code();
+	void get_max_arguments(int& _offset);
 };
 
 class SelecStat : public Node
