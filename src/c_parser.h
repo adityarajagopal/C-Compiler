@@ -53,6 +53,7 @@ public:
 	Node(int set);
 	virtual void print() =0;
 	virtual void generate_code() {};
+	virtual void get_max_arguments(int& _offset) {};
 	virtual ~Node() {};
 };
 
@@ -64,7 +65,8 @@ private:
 public:
 	File(ExternalDecl* _external_decl=NULL, File* _file=NULL);
 	void print(); 
-	void generate_code(); 
+	void generate_code();
+	void get_max_arguments(int& _offset) {}; 
 };
 
 class ExternalDecl : public Node
@@ -149,8 +151,9 @@ private:
 	std::string id;
 	Declr* declr;
 	ParamList* param_list;
+	int func_dec; 
 public:
-	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL); 
+	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL, int _fd=0); 
 	void print(); 
 	void generate_code();
 	std::string get_id();
@@ -204,6 +207,7 @@ public:
 	void print(); 
 	void generate_code();
 	void get_tag(std::string& _tag);
+	void get_max_arguments(int& _offset);
 };
 
 
@@ -217,6 +221,7 @@ public:
 	void print();
 	void get_tag(std::string& _tag);
 	void generate_code();
+	void get_max_arguments(int& _offset);
 };
 
 class IfElseExpr : public Node
@@ -242,7 +247,8 @@ public:
 	PrimExpr(std::string _value = "", int _flag=-1,Expr* _e=NULL); 
 	void print();
 	void generate_code();
-	void get_tag(std::string& _tag); 
+	void get_tag(std::string& _tag);
+	std::string get_id();
 };
 
 class CompStat : public Node
@@ -253,7 +259,8 @@ private:
 public:
 	CompStat(StatList* _stat_list=NULL, DeclList* _decl_list=NULL);
 	void print();
-	void generate_code(); 
+	void generate_code();
+	void get_max_arguments(int& _offset); 
 };
 
 class DeclList : public Node
@@ -276,6 +283,7 @@ public:
 	StatList(Stat* _stat=NULL, StatList* _stat_list=NULL);
 	void print();
 	void generate_code();
+	void get_max_arguments(int& _offset);
 };
 
 class Stat : public Node
@@ -296,13 +304,13 @@ public:
 
 class JumpStat : public Node
 {
-private:
-	Expr* expr;
+	private: Expr* expr;
 	std::string type; 
 public: 
 	JumpStat(Expr* _expr, std::string _type); 
 	void generate_code();
 	void print() {};
+	void get_max_arguments(int& _offset); 
 };
 
 class ExprStat : public Node
@@ -314,6 +322,7 @@ public:
 	void print();
 	void generate_code();
 	void get_tag(std::string& _tag);
+	void get_max_arguments(int& _offset);
 };
 
 class Expr : public Node
@@ -325,7 +334,8 @@ public:
 	Expr(AssExpr* _ass_exp=NULL, Expr* _expr=NULL);
 	void print();
 	void generate_code();
-	void get_tag(std::string& _tag); 
+	void get_tag(std::string& _tag);
+	void get_max_arguments(int& _offset);
 };
 
 class Expression : public Node
@@ -339,7 +349,8 @@ public:
 	Expression(Expression* _lhs=NULL, Expression* rhs=NULL, std::string _op="", UnaryExpr* _unary_expr=NULL);
 	void get_tag(std::string& _tag); 
 	void print(); 
-	void generate_code(); 
+	void generate_code();
+	void get_max_arguments(int& _offset);
 };
 
 class UnaryExpr : public Node
@@ -352,7 +363,8 @@ public:
 	UnaryExpr(PostFixExpr* _post_fix_expr=NULL, UnaryExpr* _unary_expr=NULL, std::string _unary_op="");
 	void print();
 	void generate_code();
-	void get_tag(std::string& _tag); 
+	void get_tag(std::string& _tag);
+	void get_max_arguments(int& _offset);
 };
 
 class PostFixExpr : public Node
@@ -367,6 +379,8 @@ public:
 	void print();
 	void generate_code(); 
 	void get_tag(std::string& _tag); 
+	void get_max_arguments(int& _offset);
+	std::string get_id(); 
 };
 
 class ArgList : public Node
@@ -376,7 +390,9 @@ private:
 	ArgList* arg_list; 
 public:
 	ArgList(AssExpr* _ass_expr=NULL, ArgList* _arg_list=NULL); 
-	void print() {}; 
+	void print() {};
+	void generate_code();
+	void get_max_arguments(int& _offset);
 };
 
 class LoopStat : public Node
@@ -390,7 +406,8 @@ private:
 public: 
 	LoopStat(ExprStat* _es1=NULL, ExprStat* _es2=NULL, Expr* _e=NULL, Stat* _s=NULL, DoStat* _ds=NULL);
 	void print();
-	void generate_code(); 
+	void generate_code();
+	void get_max_arguments(int& _offset); 
 };
 
 class DoStat : public Node
@@ -414,6 +431,7 @@ public:
 	SelecStat(Expr* _e=NULL, Stat* _si=NULL, Stat* _se=NULL); 
 	void print();
 	void generate_code();
+	void get_max_arguments(int& _offset); 
 };
 
 #endif

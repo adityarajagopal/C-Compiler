@@ -1,0 +1,203 @@
+TAG: t_0
+ID: a
+Global Scope: 0
+vector: t_0
+
+TAG: t_4
+ID: b
+Global Scope: 0
+vector: t_4
+
+TAG: t_8
+ID: c
+Global Scope: 0
+vector: t_8
+
+function: f
+OFFSET: 3
+TAG: t_16
+OP: =
+LHS: 
+RHS: 
+
+not empty
+1
+1
+TAG = t_0
+VAL = a
+1
+
+CALLING UNARY
+empty
+TAG = t_20
+VAL = 12
+1
+
+CALLING UNARY
+empty
+TAG = t_24
+VAL = f1
+1
+
+CALLING UNARY
+empty
+TAG = t_32
+VAL = 33
+1
+
+CALLING UNARY
+not empty
+1
+1
+TAG = t_4
+VAL = b
+1
+
+CALLING UNARY
+not empty
+1
+1
+TAG = t_0
+VAL = a
+1
+
+function: f1
+OFFSET: 0
+TAG: t_16
+ID: a
+Global Scope: 1
+vector: t_16
+
+TAG: t_20
+ID: b
+Global Scope: 1
+vector: t_20
+
+TAG: t_24
+ID: c
+Global Scope: 1
+vector: t_24
+
+TAG: t_28
+ID: d
+Global Scope: 1
+vector: t_28
+
+CALLING UNARY
+not empty
+1
+1
+TAG = t_32
+VAL = 12
+1
+
+TAG: t_36
+ID: e
+Global Scope: 1
+vector: t_36
+
+Tag = t_40
+OP = /
+left = 
+right = 
+unary = 
+
+CALLING UNARY
+not empty
+1
+1
+TAG = t_44
+VAL = 12
+1
+
+CALLING UNARY
+not empty
+1
+1
+TAG = t_48
+VAL = 33
+1
+
+TAG: t_52
+ID: g
+Global Scope: 1
+vector: t_52
+
+Tag = t_56
+OP = +
+left = 
+right = 
+unary = 
+
+CALLING UNARY
+not empty
+1
+2
+TAG = t_20
+VAL = b
+1
+
+CALLING UNARY
+not empty
+1
+2
+TAG = t_16
+VAL = a
+1
+
+TAG: t_60
+OP: =
+LHS: 
+RHS: 
+
+not empty
+1
+2
+TAG = t_16
+VAL = a
+1
+
+CALLING UNARY
+empty
+TAG = t_64
+VAL = 155
+1
+
+Tag = t_68
+OP = ==
+left = 
+right = 
+unary = 
+
+CALLING UNARY
+not empty
+1
+1
+TAG = t_72
+VAL = 12
+1
+
+CALLING UNARY
+not empty
+1
+2
+TAG = t_16
+VAL = a
+1
+
+TAG: t_76
+OP: =
+LHS: 
+RHS: 
+
+not empty
+2
+2
+TAG = t_16
+VAL = a
+2
+
+CALLING UNARY
+not empty
+2
+1

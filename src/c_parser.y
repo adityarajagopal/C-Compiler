@@ -17,11 +17,14 @@ int global_scope = 0;
 int arg_reg = 4;
 int glbl_loop_num = 0;
 int glbl_selec_num = 0;
-int num_arguments = 0; 
+int num_arguments = 0;
+int is_func_dec = 0; 
+
 
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
 std::map<std::string, int> FuncMap;
+std::map<Tag, int> ReturnValMap;
 
 std::vector<Tag> Arguments;
 
@@ -113,15 +116,14 @@ void FuncDef::generate_code()
 		comp_stat->get_max_arguments(offset);
 		std::cerr << "function: " << declr->get_id() << std::endl; 
 		std::cerr << "OFFSET: " << offset << std::endl; 
-		if(offset < 4) {offset = 20;}
-		else {offset = 4 + offset * 4;}
+		if(offset < 4) {offset = 16;}
+		else {offset = offset * 4;}
 	}
 	else
 	{
-		offset = 20;
+		offset = 16;
 	}
 
-	Arguments.clear(); 
 
 	Hdr << "\t" << ".align\t2" << std::endl; 
 	Hdr << "\t" << ".globl\t" << declr->get_id();
@@ -141,9 +143,7 @@ void FuncDef::generate_code()
 	
 	if(comp_stat != NULL)
 	{
-		//global_scope++;
 		comp_stat->generate_code();
-		//global_scope--;
 	}
 	
 	for(int i=0; i<Arguments.size(); i++)
@@ -158,6 +158,7 @@ void FuncDef::generate_code()
 			FuncInit << "\tsw\t$" << TMP1 << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 	
 		}
 	}
+	Arguments.clear(); 
 
 	SetupFp << "\taddiu\t$sp,$sp,-" << offset+12 << std::endl;
 	SetupFp << "\tsw\t$fp," << offset+4 << "($sp)" << std::endl;
@@ -171,6 +172,7 @@ void FuncDef::generate_code()
 	RestoreFp << "\tj\t" << "$31" << std::endl;
 	RestoreFp << "\tnop" << std::endl; 
 
+	//Ftr << "\t" << ".cprestore\t16" << std::endl; 
 	Ftr << "\t" << ".end\t" << declr->get_id(); 
 	Ftr << std::endl; 
 	Ftr << "\t" << ".size\t" << declr->get_id(); 
@@ -195,7 +197,11 @@ void Decl::print()
 }
 void Decl::generate_code()
 {
-	if(init_list != NULL){init_list->generate_code();}
+	if(init_list != NULL)
+	{
+		init_list->generate_code();
+		is_func_dec = 1;
+	}
 }
 
 DeclSpec::DeclSpec(TypeSpec* _type_spec, DeclSpec* _decl_spec) : type_spec(_type_spec), decl_spec(_decl_spec) {}
@@ -265,7 +271,7 @@ void InitDeclr::generate_code()
 	}
 }
 
-Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list) : id(_id), declr(_declr), param_list(_param_list){}
+Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list, int _fd) : id(_id), declr(_declr), param_list(_param_list), func_dec(_fd) {}
 
 void Declr::print()
 {
@@ -286,6 +292,9 @@ void Declr::print()
 }
 void Declr::generate_code()
 {
+	if(param_list != NULL && is_func_dec == 0){param_list->generate_code();}
+	else {is_func_dec = 0;}
+	
 	if(id != "")
 	{
 		tag = set_offset();
@@ -299,8 +308,7 @@ void Declr::generate_code()
 		std::cerr << std::endl; 
 	}
 
-	if(param_list != NULL){param_list->generate_code();}
-	if(declr != NULL){declr->generate_code();}
+	if(declr != NULL && func_dec == 0){declr->generate_code();}
 }
 std::string Declr::get_id()
 {
@@ -1280,10 +1288,19 @@ void PostFixExpr::generate_code()
 	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
 	if(arg_list != NULL) 
 	{
+		tag = set_offset();
+		
 		num_arguments = 0; 
 		arg_list->generate_code();
+
+		os << "\tla\t$" << TMP1 << "," << post_fix_expr->get_id() << std::endl; 
+		os << "\tjalr\t$" << TMP1 << std::endl; 
+		os << "\tnop" << std::endl; 
+		/*
 		os << "\tjal\t" << post_fix_expr->get_id() << std::endl; 
 		os << "\tnop" << std::endl; 
+		*/
+		os << "\tsw\t$2," << OffsetMap[tag] << "($fp)" << std::endl;  
 	}
 	if(op != "")
 	{
@@ -1319,6 +1336,7 @@ void PostFixExpr::get_tag(std::string& _tag)
 {
 	if(op != "") {_tag = tag;}
 	if(prim_expr != NULL) {prim_expr->get_tag(_tag);}
+	if(arg_list != NULL) {_tag = tag;}
 }
 void PostFixExpr::get_max_arguments(int& _offset)
 {
@@ -1352,15 +1370,14 @@ void ArgList::generate_code()
 	if(ass_expr != NULL) 
 	{
 		ass_expr->generate_code(); 
-		std::string ass_tag; 
+		std::string ass_tag = ""; 
 		ass_expr->get_tag(ass_tag);
-		os << "\tlw\t$" << TMP1 << "," << OffsetMap[ass_tag] << "($fp)" << std::endl; 
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[ass_tag] << "($fp)" << std::endl;
 		if(num_arguments < 4)
 		{
 			os << "\tmove\t$a" << num_arguments << ",$" << TMP1 << std::endl; 
 		}
 		os << "\tsw\t$" << TMP1 << "," << num_arguments*4 << "($fp)" << std::endl;
-
 		num_arguments++; 
 	}
 	if(arg_list != NULL){arg_list->generate_code();}
@@ -1743,8 +1760,8 @@ statement		: compound_statement {}
 				;
 
 declarator		: IDENTIFIER {$$ = new Declr($1);} 
-				| declarator LBRAC param_list RBRAC {$$ = new Declr("", $1, $3);} 
-				| declarator LBRAC RBRAC {$$ = new Declr("", $1);}
+				| declarator LBRAC param_list RBRAC {$$ = new Declr("", $1, $3, 1);} 
+				| declarator LBRAC RBRAC {$$ = new Declr("", $1, NULL, 1);}
 				;
 
 param_list		: param_decl {$$ = new ParamList($1);}
@@ -1883,7 +1900,7 @@ postfix_expr	: primary_expr {$$ = new PostFixExpr($1);}
 				;
 
 argument_list 	: assign_expr {$$ = new ArgList($1);}
-				| argument_list COMMA assign_expr {$$ = new ArgList($3,$1);}
+				| assign_expr COMMA argument_list {$$ = new ArgList($1,$3);}
 				;
 
 primary_expr	: IDENTIFIER {$$ = new PrimExpr($1,0);} 
