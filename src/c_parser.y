@@ -321,9 +321,9 @@ void Declr::generate_code()
 	{
 		cond_expr->generate_code(); 
 		std::string size_tag; 
-		cond_expr->get_tag(size_tag); 
+		declr->get_tag(size_tag); 
 		//os << "\tlw\t$" << TMP1 << "," << OffsetMap[size_tag] << "($fp)" << std::endl;
-		ArrayLabel << "arr_" << OffsetMap[size_tag] << ":\t"; 
+		ArrayLabel << std::endl << "arr_" << OffsetMap[size_tag] << ":\t" << ".word"; 
 		os << "\tla\t$" << ARR_REG << "," << "arr_" << OffsetMap[size_tag] << std::endl;  
 	}
 }
@@ -337,6 +337,7 @@ void Declr::get_tag(std::string& _tag)
 	if(id != "") {_tag = tag;}
 	if(declr != NULL) {declr->get_tag(_tag);}
 	if(param_list != NULL) {param_list->get_tag(_tag);}
+	if(cond_expr != NULL) {cond_expr->get_tag(_tag);}
 }
 
 InitVal::InitVal(AssExpr* _ass_expr, InitValList* _init_val_list) : ass_expr(_ass_expr), init_val_list(_init_val_list) {}
@@ -361,6 +362,7 @@ void InitVal::generate_code()
 void InitVal::get_tag(std::string& _tag)
 {
 	if(ass_expr != NULL) {ass_expr->get_tag(_tag);}
+	if(init_val_list != NULL) {init_val_list->get_tag(_tag);}
 }
 
 InitValList::InitValList(InitVal* _init_val, InitValList* _init_val_list) : init_val(_init_val), init_val_list(_init_val_list) {}
@@ -372,7 +374,8 @@ void InitValList::generate_code()
 		std::string arr_tag; 
 		init_val->get_tag(arr_tag);
 		os << "\tlw\t$" << TMP1 << "," << OffsetMap[arr_tag]  << "($fp)" << std::endl;
-		os << "\tsw\t$" << TMP1 << "," << arr_index << "($" << ARR_REG << ")" << std::endl; 
+		os << "\tsw\t$" << TMP1 << "," << arr_index*4 << "($" << ARR_REG << ")" << std::endl;
+		ArrayLabel << "\t0,"; 
 		arr_index++;
 	}
 
@@ -380,6 +383,11 @@ void InitValList::generate_code()
 	{
 		init_val_list->generate_code();
 	}
+}
+void InitValList::get_tag(std::string& _tag)
+{
+	if(init_val != NULL) {init_val->get_tag(_tag);}
+	if(init_val_list != NULL){init_val_list->get_tag(_tag);}
 }
 
 ParamList::ParamList(ParamDecl* _param_decl, ParamList* _param_list) : param_decl(_param_decl), param_list(_param_list) {}
@@ -1442,12 +1450,30 @@ void PostFixExpr::generate_code()
 			os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
 		}
 	}
+	if(expr != NULL)
+	{
+		tag = set_offset();
+
+		expr->generate_code(); 
+		std::string e_tag; 
+		expr->get_tag(e_tag);
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[e_tag] << "($fp)" << std::endl; 
+
+		std::string pe_tag; 
+		post_fix_expr->get_tag(pe_tag); 
+		os << "\tla\t$" << ARR_REG << ",arr_" << OffsetMap[pe_tag] << std::endl;
+		os << "\tsll\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
+		os << "\tadd\t$" << ARR_REG << ",$" << ARR_REG << ",$" << TMP1 << std::endl;
+		os << "\tlw\t$" << TMP1 << ",0($" << ARR_REG << ")" << std::endl; 
+		os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+	}
 }
 void PostFixExpr::get_tag(std::string& _tag)
 {
 	if(op != "") {_tag = tag;}
-	if(prim_expr != NULL) {prim_expr->get_tag(_tag);}
 	if(arg_list != NULL) {_tag = tag;}
+	if(expr != NULL){_tag = tag;}
+	if(prim_expr != NULL) {prim_expr->get_tag(_tag);}
 }
 void PostFixExpr::get_max_arguments(int& _offset)
 {
@@ -1805,7 +1831,7 @@ void SelecStat::get_max_arguments(int& _offset)
 }
 
 TagStat::TagStat(Stat* _stat, CondExpr* _cond_expr, std::string _id) : stat(_stat), cond_expr(_cond_expr), id(_id) {}
-void TagStat::generate_code()
+void TagStat::generate_code()	
 {
 	if(id != "")
 	{
@@ -2228,6 +2254,7 @@ int yyerror(const char* s)
 int main() 
 {
 	yyparse();
-	root->generate_code(); 
+	root->generate_code();
+	TUnit << "\t.data\n" << ArrayLabel.str() << std::endl; 
 	std::cout << "\t.text\n" << TUnit.str(); 
 }

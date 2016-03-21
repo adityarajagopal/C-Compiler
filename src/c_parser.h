@@ -185,6 +185,7 @@ public:
 	InitValList(InitVal* _init_val=NULL, InitValList* _init_val_list=NULL);
 	void print() {};
 	void generate_code();
+	void get_tag(std::string& _tag);
 };
 
 class ParamList : public Node
