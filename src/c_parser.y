@@ -5,6 +5,8 @@
 #define TMP1 8
 #define TMP2 9
 #define TMP3 10
+#define ARR_REG 11
+#define CASE_REG 12
 
 int yylex();
 int yyerror(const char* s);
@@ -19,6 +21,9 @@ int glbl_loop_num = 0;
 int glbl_selec_num = 0;
 int num_arguments = 0;
 int num_parameters = 0;
+int arr_index = 0;
+int case_num = 0;
+int break_num = 0; 
 
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
@@ -26,8 +31,9 @@ std::map<std::string, int> FuncMap;
 std::map<Tag, int> ReturnValMap;
 
 std::vector<Tag> Arguments;
+std::vector<int> Breaks; 
 
-std::stringstream TUnit , Hdr, SetupFp, os, RestoreFp, Ftr, FuncInit;  
+std::stringstream TUnit , Hdr, SetupFp, os, RestoreFp, Ftr, FuncInit, ArrayLabel;  
 
 std::string set_offset()
 {
@@ -271,7 +277,7 @@ void InitDeclr::generate_code()
 	}
 }
 
-Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list, int _fd) : id(_id), declr(_declr), param_list(_param_list), func_dec(_fd) {}
+Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list, int _fd, CondExpr* _cond_expr) : id(_id), declr(_declr), param_list(_param_list), func_dec(_fd), cond_expr(_cond_expr) {}
 
 void Declr::print()
 {
@@ -308,6 +314,16 @@ void Declr::generate_code()
 	}
 
 	if(declr != NULL){declr->generate_code();}
+
+	if(cond_expr != NULL)
+	{
+		cond_expr->generate_code(); 
+		std::string size_tag; 
+		cond_expr->get_tag(size_tag); 
+		//os << "\tlw\t$" << TMP1 << "," << OffsetMap[size_tag] << "($fp)" << std::endl;
+		ArrayLabel << "arr_" << OffsetMap[size_tag] << ":\t"; 
+		os << "\tla\t$" << ARR_REG << "," << "arr_" << OffsetMap[size_tag] << std::endl;  
+	}
 }
 std::string Declr::get_id()
 {
@@ -321,7 +337,7 @@ void Declr::get_tag(std::string& _tag)
 	if(param_list != NULL) {param_list->get_tag(_tag);}
 }
 
-InitVal::InitVal(AssExpr* _ass_expr) : ass_expr(_ass_expr) {}
+InitVal::InitVal(AssExpr* _ass_expr, InitValList* _init_val_list) : ass_expr(_ass_expr), init_val_list(_init_val_list) {}
 void InitVal::print()
 {
 	if(ass_expr != NULL)
@@ -331,11 +347,37 @@ void InitVal::print()
 }
 void InitVal::generate_code()
 {
-	if(ass_expr != NULL){ass_expr->generate_code();}
+	if(ass_expr != NULL)
+	{
+		ass_expr->generate_code();
+	}
+	if(init_val_list != NULL) 
+	{
+		init_val_list->generate_code();
+	}
 }
 void InitVal::get_tag(std::string& _tag)
 {
 	if(ass_expr != NULL) {ass_expr->get_tag(_tag);}
+}
+
+InitValList::InitValList(InitVal* _init_val, InitValList* _init_val_list) : init_val(_init_val), init_val_list(_init_val_list) {}
+void InitValList::generate_code()
+{
+	if(init_val != NULL)
+	{
+		init_val->generate_code();
+		std::string arr_tag; 
+		init_val->get_tag(arr_tag);
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[arr_tag]  << "($fp)" << std::endl;
+		os << "\tsw\t$" << TMP1 << "," << arr_index << "($" << ARR_REG << ")" << std::endl; 
+		arr_index++;
+	}
+
+	if(init_val_list != NULL)
+	{
+		init_val_list->generate_code();
+	}
 }
 
 ParamList::ParamList(ParamDecl* _param_decl, ParamList* _param_list) : param_decl(_param_decl), param_list(_param_list) {}
@@ -785,6 +827,7 @@ void CompStat::print()
 void CompStat::generate_code()
 {
 	global_scope++;
+
 	if(decl_list != NULL){decl_list->generate_code();}
 	if(stat_list != NULL){stat_list->generate_code();}
 	//resize all vectors everytime we exit a scope so that past variables in deepr scopes aren't kept
@@ -792,6 +835,7 @@ void CompStat::generate_code()
 	{
 		it->second.resize(global_scope); 
 	}
+	
 	global_scope--;
 }
 void CompStat::get_max_arguments(int& _offset)
@@ -893,6 +937,11 @@ void JumpStat::generate_code()
 			os << "$0" << std::endl; 
 		}
 		
+	}
+
+	if(type == "break")
+	{
+		os << "\tj\t" << "break_" << Breaks.back() << std::endl;  
 	}
 }
 void JumpStat::get_max_arguments(int& _offset) 
@@ -1326,7 +1375,7 @@ void UnaryExpr::get_max_arguments(int& _offset)
 	else {_offset = ue;}
 }
 
-PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list) {}
+PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list, Expr* _expr) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list), expr(_expr) {}
 void PostFixExpr::print()
 {
 	if(prim_expr != NULL)
@@ -1508,6 +1557,7 @@ void LoopStat::print()
 }
 void LoopStat::generate_code()
 {
+	Breaks.push_back(++break_num);
 	//increment loop number count
 	int loop_num = glbl_loop_num; 
 	//while loop
@@ -1556,7 +1606,10 @@ void LoopStat::generate_code()
 		glbl_loop_num++;
 		do_stat->generate_code();
 	}
+	
 	loop_num--;
+	os << "break_" << Breaks.back() << ":" << std::endl;
+	Breaks.pop_back();
 }
 void LoopStat::get_max_arguments(int& _offset) 
 {
@@ -1636,7 +1689,7 @@ void DoStat::get_max_arguments(int& _offset)
 	else {_offset = e;}
 }
 
-SelecStat::SelecStat(Expr* _e, Stat* _si, Stat* _se) : expr(_e), stat_if(_si), stat_else(_se) {}
+SelecStat::SelecStat(Expr* _e, Stat* _si, Stat* _se, Stat* _s) : expr(_e), stat_if(_si), stat_else(_se), stat(_s) {}
 void SelecStat::print() 
 {
 	if(expr != NULL)
@@ -1657,6 +1710,7 @@ void SelecStat::print()
 }
 void SelecStat::generate_code()
 {
+	Breaks.push_back(++break_num);
 	int selec_num = glbl_selec_num; 
 	if(stat_if != NULL)
 	{
@@ -1679,8 +1733,25 @@ void SelecStat::generate_code()
 		//glbl_selec_num++;
 		stat_else->generate_code();
 	}
-	os << "if_out_" << selec_num << ":" << std::endl; 
-	selec_num--;
+	if(stat == NULL)
+	{
+		os << "if_out_" << selec_num << ":" << std::endl; 
+		selec_num--;
+	}
+	else if(stat != NULL)
+	{
+		if(expr != NULL) 
+		{
+			expr->generate_code();
+		}
+		std::string e_tag; 
+		expr->get_tag(e_tag);
+		os << "\tlw\t$" << CASE_REG << "," << OffsetMap[e_tag] << "($fp)" << std::endl; 
+		stat->generate_code();
+
+		os << "break_" << Breaks.back() << ":" << std::endl;
+		Breaks.pop_back();
+	}
 }
 void SelecStat::get_max_arguments(int& _offset) 
 {
@@ -1722,6 +1793,51 @@ void SelecStat::get_max_arguments(int& _offset)
 		_offset = max;
 		*/
 	}
+}
+
+TagStat::TagStat(Stat* _stat, CondExpr* _cond_expr, std::string _id) : stat(_stat), cond_expr(_cond_expr), id(_id) {}
+void TagStat::generate_code()
+{
+	if(id != "")
+	{
+		os << "tag_" << id << ":" << std::endl; 
+		if(stat != NULL)
+		{
+			stat->generate_code(); 
+		}
+	}
+	//case statement
+	if(cond_expr != NULL)
+	{
+		os << "case_" << case_num << ":" << std::endl; 
+		cond_expr->generate_code(); 
+		std::string c_tag=""; 
+		cond_expr->get_tag(c_tag);
+
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[c_tag] << "($fp)" << std::endl; 
+		//os << "\tli\t$" << TMP2 << "," << case_num << std::endl; 
+		os << "\tbne\t$" << TMP1 << ",$" << CASE_REG << "," << "case_" << case_num+1 << std::endl;
+		os << "\tnop" << std::endl; 
+		
+		os << "body_" << case_num << ":" << std::endl; 
+		if(stat != NULL) 
+		{
+			stat->generate_code();
+		}
+		
+		os << "\tj\t" << "body_" << case_num+1 << std::endl;
+		os << "\tnop" << std::endl; 
+
+		case_num++;
+	}
+	//default
+	if(stat != NULL && cond_expr == NULL && id == "")
+	{
+		os <<"case_" << case_num << ":" << std::endl;
+		os << "body_" << case_num << ":" << std::endl;
+		stat->generate_code();
+	}
+	
 }
 
 IfElseExpr::IfElseExpr(Expression* _ic, Expr* _ie, CondExpr* _ee) : if_cond(_ic), if_expr(_ie), else_expr(_ee) {}
@@ -1817,9 +1933,11 @@ void IfElseExpr::get_tag(std::string& _tag)
 	class DoStat* Do_Stat;
 	class SelecStat* Selec_Stat;
 	class IfElseExpr* IE_Expr;
+	class InitValList* Init_Val_List;
+	class TagStat* Tag_Stat;
 }
 
-%token SEMICOLON COMMA LCURLY RCURLY LBRAC RBRAC
+%token SEMICOLON COMMA LCURLY RCURLY LBRAC RBRAC LSQBRAC RSQBRAC
 %token INT FLOAT DOUBLE BOOL
 %token LONG UNSIGNED SIGNED CONST SHORT
 %token VOID STRUCT UNION CHAR TYPEDEF VOLATILE STRING
@@ -1861,6 +1979,8 @@ void IfElseExpr::get_tag(std::string& _tag)
 %type<Arg_List> argument_list
 %type<Prim_Expr> primary_expr
 %type<IE_Expr> ie_expr
+%type<Init_Val_List> init_val_list
+%type<Tag_Stat> tag_statement
 
 %% 
 
@@ -1907,11 +2027,14 @@ statement		: compound_statement {}
 				| selection_statement {}
 				| loop_statement {}
 				| jump_statement {}
+				| tag_statement {}
 				;
 
 declarator		: IDENTIFIER {$$ = new Declr($1);} 
 				| declarator LBRAC param_list RBRAC {$$ = new Declr("", $1, $3, 1);} 
 				| declarator LBRAC RBRAC {$$ = new Declr("", $1, NULL, 1);}
+				| declarator LSQBRAC conditional_expr RSQBRAC {$$ = new Declr("",$1,NULL,0,$3);}
+				| declarator LSQBRAC RSQBRAC {$$ = new Declr("",$1,NULL,0,NULL);}
 				;
 
 param_list		: param_decl {$$ = new ParamList($1);}
@@ -1928,10 +2051,16 @@ compound_statement	: LCURLY RCURLY {$$ = new CompStat();}
 					;
 
 initial_val		: assign_expr {$$ = new InitVal($1);}
+				| LCURLY init_val_list RCURLY {$$ = new InitVal(NULL,$2);}
+				;
+
+init_val_list 	: initial_val {$$ = new InitValList($1);}
+				| initial_val COMMA init_val_list {$$ = new InitValList($1,$3);}
 				;
 
 selection_statement : IF LBRAC expr RBRAC statement {$$ = new SelecStat($3,$5);} 
 					| IF LBRAC expr RBRAC statement ELSE statement {$$ = new SelecStat($3,$5,$7);}
+					| SWITCH LBRAC expr RBRAC statement {$$ = new SelecStat($3,NULL,NULL,$5);}
 					;
 
 loop_statement	: WHILE LBRAC expr RBRAC statement {$$ = new LoopStat(NULL,NULL,$3,$5);}
@@ -1949,8 +2078,14 @@ expr_statement 	: SEMICOLON {$$ = new ExprStat();}
 
 jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON {} 
 				| RETURN SEMICOLON {$$ = new JumpStat(NULL, "return");}
-				| RETURN expr SEMICOLON {$$ = new JumpStat($2, "return");} 
+				| RETURN expr SEMICOLON {$$ = new JumpStat($2, "return");}
+				| BREAK SEMICOLON {$$ = new JumpStat(NULL, "break");}
 				;
+
+tag_statement 	: IDENTIFIER COLON statement {$$ = new TagStat($3, NULL, $1);}
+				| CASE conditional_expr COLON statement {$$ = new TagStat($4,$2);}
+				| DEFAULT COLON statement {$$ = new TagStat($3);}
+				;				
 
 expr			: assign_expr {$$ = new Expr($1);}  
 				| expr COMMA assign_expr {$$ = new Expr($3,$1);}
@@ -2047,6 +2182,7 @@ postfix_expr	: primary_expr {$$ = new PostFixExpr($1);}
 				| postfix_expr LBRAC argument_list RBRAC {$$ = new PostFixExpr(NULL,$1,"",$3);}
 				| postfix_expr INC {$$ = new PostFixExpr(NULL, $1, $2);}
 				| postfix_expr DEC {$$ = new PostFixExpr(NULL, $1, $2);}
+				| postfix_expr LSQBRAC expr RSQBRAC {$$ = new PostFixExpr(NULL, $1, "", NULL, $3);}
 				;
 
 argument_list 	: assign_expr {$$ = new ArgList($1);}

@@ -83,7 +83,9 @@ OR_EQUALS			\|=
 XOR_EQUALS			\^=
 QUESTION_MARK		\?
 COLON				\:
-PUNCTUATOR_OP		\[|\]|\(|\)|\.\.\.|\.|\-\>
+PUNCTUATOR_OP		\(|\)|\.\.\.|\.|\-\>
+LSQBRAC				\[
+RSQBRAC				\]
 SEMICOLON			;
 COMMA				\,
 LCURLY				\{
@@ -124,6 +126,8 @@ SPACE 				[ ]*
 {COMMA}				{return COMMA;}
 {LCURLY}			{return LCURLY;}
 {RCURLY}			{return RCURLY;}
+{LSQBRAC}			{return LSQBRAC;}
+{RSQBRAC}			{return RSQBRAC;}
 {EQUALS}			{yylval.string = strdup(yytext);  return EQUALS;}
 {MUL_EQUALS} 		{yylval.string = strdup(yytext);  return MUL_EQUALS;}
 {DIV_EQUALS}		{yylval.string = strdup(yytext);  return DIV_EQUALS;} 

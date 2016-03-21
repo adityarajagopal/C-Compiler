@@ -41,6 +41,8 @@ class PostFixExpr;
 class ArgList;
 class DoStat;
 class IfElseExpr;
+class InitValList;
+class TagStat;
 
 typedef std::string Tag;
 
@@ -152,9 +154,10 @@ private:
 	std::string id;
 	Declr* declr;
 	ParamList* param_list;
+	CondExpr* cond_expr;
 	int func_dec; 
 public:
-	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL, int _fd=0); 
+	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL, int _fd=0, CondExpr* _cond_expr=NULL); 
 	void print(); 
 	void generate_code();
 	std::string get_id();
@@ -164,12 +167,24 @@ public:
 class InitVal : public Node
 {
 private:
-	AssExpr* ass_expr; 
+	AssExpr* ass_expr;
+	InitValList* init_val_list;
 public:
-	InitVal(AssExpr* _ass_expr=NULL); 
+	InitVal(AssExpr* _ass_expr=NULL, InitValList* _init_val_list=NULL); 
 	void print();
 	void generate_code();
 	void get_tag(std::string& _tag); 
+};
+
+class InitValList : public Node
+{
+private:
+	InitVal* init_val; 
+	InitValList* init_val_list;
+public:
+	InitValList(InitVal* _init_val=NULL, InitValList* _init_val_list=NULL);
+	void print() {};
+	void generate_code();
 };
 
 class ParamList : public Node
@@ -305,13 +320,26 @@ public:
 
 class JumpStat : public Node
 {
-	private: Expr* expr;
-	std::string type; 
+private: 
+	Expr* expr;
+	std::string type;
 public: 
 	JumpStat(Expr* _expr, std::string _type); 
 	void generate_code();
 	void print() {};
 	void get_max_arguments(int& _offset); 
+};
+
+class TagStat : public Node
+{
+private:
+	Stat* stat; 
+	CondExpr* cond_expr;
+	std::string id; 
+public:
+	TagStat(Stat* _stat=NULL, CondExpr* _cond_expr=NULL, std::string _id="");
+	void print() {};
+	void generate_code();
 };
 
 class ExprStat : public Node
@@ -374,9 +402,10 @@ private:
 	PrimExpr* prim_expr; 
 	PostFixExpr* post_fix_expr; 
 	std::string op;
-	ArgList* arg_list; 
+	ArgList* arg_list;
+	Expr* expr; 
 public:
-	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="", ArgList* _arg_list=NULL);
+	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="", ArgList* _arg_list=NULL, Expr* _expr=NULL);
 	void print();
 	void generate_code(); 
 	void get_tag(std::string& _tag); 
@@ -429,8 +458,9 @@ private:
 	Expr* expr; 
 	Stat* stat_if; 
 	Stat* stat_else;
+	Stat* stat; 
 public:
-	SelecStat(Expr* _e=NULL, Stat* _si=NULL, Stat* _se=NULL); 
+	SelecStat(Expr* _e=NULL, Stat* _si=NULL, Stat* _se=NULL, Stat* _s=NULL); 
 	void print();
 	void generate_code();
 	void get_max_arguments(int& _offset); 
