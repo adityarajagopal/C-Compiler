@@ -1809,7 +1809,7 @@ void TagStat::generate_code()
 	//case statement
 	if(cond_expr != NULL)
 	{
-		os << "case_" << case_num << ":" << std::endl; 
+		//os << "case_" << case_num << ":" << std::endl; 
 		cond_expr->generate_code(); 
 		std::string c_tag=""; 
 		cond_expr->get_tag(c_tag);
@@ -1829,12 +1829,15 @@ void TagStat::generate_code()
 		os << "\tnop" << std::endl; 
 
 		case_num++;
+		
+		os <<"case_" << case_num << ":" << std::endl;
+		//os << "body_" << case_num << ":" << std::endl;
 	}
 	//default
 	if(stat != NULL && cond_expr == NULL && id == "")
 	{
-		os <<"case_" << case_num << ":" << std::endl;
-		os << "body_" << case_num << ":" << std::endl;
+		//os <<"case_" << case_num << ":" << std::endl;
+		//os << "body_" << case_num << ":" << std::endl;
 		stat->generate_code();
 	}
 	
