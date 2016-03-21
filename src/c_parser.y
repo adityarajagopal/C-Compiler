@@ -25,6 +25,8 @@ int arr_index = 0;
 int case_num = 0;
 int break_num = 0; 
 
+bool cases = true;
+
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
 std::map<std::string, int> FuncMap;
@@ -1710,7 +1712,6 @@ void SelecStat::print()
 }
 void SelecStat::generate_code()
 {
-	Breaks.push_back(++break_num);
 	int selec_num = glbl_selec_num; 
 	if(stat_if != NULL)
 	{
@@ -1740,6 +1741,7 @@ void SelecStat::generate_code()
 	}
 	else if(stat != NULL)
 	{
+		Breaks.push_back(++break_num);
 		if(expr != NULL) 
 		{
 			expr->generate_code();
@@ -1747,6 +1749,13 @@ void SelecStat::generate_code()
 		std::string e_tag; 
 		expr->get_tag(e_tag);
 		os << "\tlw\t$" << CASE_REG << "," << OffsetMap[e_tag] << "($fp)" << std::endl; 
+
+		cases = true; 
+		int curr_case_num = case_num; 
+		stat->generate_code();
+		
+		cases = false;
+		case_num = curr_case_num; 
 		stat->generate_code();
 
 		os << "break_" << Breaks.back() << ":" << std::endl;
@@ -1809,32 +1818,39 @@ void TagStat::generate_code()
 	//case statement
 	if(cond_expr != NULL)
 	{
-		//os << "case_" << case_num << ":" << std::endl; 
-		cond_expr->generate_code(); 
-		std::string c_tag=""; 
-		cond_expr->get_tag(c_tag);
-
-		os << "\tlw\t$" << TMP1 << "," << OffsetMap[c_tag] << "($fp)" << std::endl; 
-		//os << "\tli\t$" << TMP2 << "," << case_num << std::endl; 
-		os << "\tbne\t$" << TMP1 << ",$" << CASE_REG << "," << "case_" << case_num+1 << std::endl;
-		os << "\tnop" << std::endl; 
-		
-		os << "body_" << case_num << ":" << std::endl; 
-		if(stat != NULL) 
+		if(cases)
 		{
-			stat->generate_code();
+			//os << "case_" << case_num << ":" << std::endl; 
+			cond_expr->generate_code(); 
+			std::string c_tag=""; 
+			cond_expr->get_tag(c_tag);
+
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[c_tag] << "($fp)" << std::endl; 
+			//os << "\tli\t$" << TMP2 << "," << case_num << std::endl; 
+			os << "\tbne\t$" << TMP1 << ",$" << CASE_REG << "," << "case_" << case_num+1 << std::endl;
+			os << "\tnop" << std::endl;
+			os << "\tj\t" << "body_" << case_num << std::endl;
+			os << "\tnop" << std::endl;
+			
+			case_num++;
+			os << "case_" << case_num << ":" << std::endl; 
+		}
+		else
+		{
+			os << "body_" << case_num << ":" << std::endl; 
+			if(stat != NULL) 
+			{
+				stat->generate_code();
+			}
+
+			case_num++;
 		}
 		
-		os << "\tj\t" << "body_" << case_num+1 << std::endl;
-		os << "\tnop" << std::endl; 
-
-		case_num++;
-		
-		os <<"case_" << case_num << ":" << std::endl;
+		//os <<"case_" << case_num << ":" << std::endl;
 		//os << "body_" << case_num << ":" << std::endl;
 	}
 	//default
-	if(stat != NULL && cond_expr == NULL && id == "")
+	if(stat != NULL && cond_expr == NULL && id == "" && !cases)
 	{
 		//os <<"case_" << case_num << ":" << std::endl;
 		//os << "body_" << case_num << ":" << std::endl;
