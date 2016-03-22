@@ -396,7 +396,7 @@ public:
 	void get_tag(std::string& _tag);
 	void get_max_arguments(int& _offset);
 	void get_type(std::string& _type);
-	void set_modify(); 
+	void set_modify(bool status); 
 };
 
 class PostFixExpr : public Node
@@ -416,7 +416,7 @@ public:
 	void get_max_arguments(int& _offset);
 	std::string get_id();
 	void get_type(std::string& _type);
-	void set_modify();
+	void set_modify(bool status);
 };
 
 class ArgList : public Node
