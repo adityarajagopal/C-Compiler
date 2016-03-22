@@ -319,12 +319,14 @@ void Declr::generate_code()
 
 	if(cond_expr != NULL)
 	{
+		//tag = set_offset();
 		cond_expr->generate_code(); 
 		std::string size_tag; 
 		declr->get_tag(size_tag); 
 		//os << "\tlw\t$" << TMP1 << "," << OffsetMap[size_tag] << "($fp)" << std::endl;
 		ArrayLabel << std::endl << "arr_" << OffsetMap[size_tag] << ":\t" << ".word"; 
-		os << "\tla\t$" << ARR_REG << "," << "arr_" << OffsetMap[size_tag] << std::endl;  
+		os << "\tla\t$" << ARR_REG << "," << "arr_" << OffsetMap[size_tag] << std::endl; 
+		//os << "\tsw\t$" << ARR_REG << "," << OffsetMap[size_tag] << "($fp)" << std::endl;
 	}
 }
 std::string Declr::get_id()
@@ -484,6 +486,9 @@ void AssExpr::generate_code()
 
 	if(unary_expr != NULL)
 	{
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array") {unary_expr->set_modify();}
 		unary_expr->generate_code();
 	}
 	
@@ -507,14 +512,32 @@ void AssExpr::generate_code()
 	
 	if(ass_oper == "=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw\t$" << TMP1 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
 	}
 	
 	
@@ -1384,8 +1407,16 @@ void UnaryExpr::get_max_arguments(int& _offset)
 	if(pe > ue) {_offset = pe;}
 	else {_offset = ue;}
 }
+void UnaryExpr::get_type(std::string& _type)
+{
+	if(post_fix_expr != NULL) {post_fix_expr->get_type(_type);}
+}
+void UnaryExpr::set_modify()
+{
+	if(post_fix_expr != NULL) {post_fix_expr->set_modify();}
+}
 
-PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list, Expr* _expr) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list), expr(_expr) {}
+PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list, Expr* _expr) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list), expr(_expr), modify(false) {}
 void PostFixExpr::print()
 {
 	if(prim_expr != NULL)
@@ -1464,8 +1495,15 @@ void PostFixExpr::generate_code()
 		os << "\tla\t$" << ARR_REG << ",arr_" << OffsetMap[pe_tag] << std::endl;
 		os << "\tsll\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
 		os << "\tadd\t$" << ARR_REG << ",$" << ARR_REG << ",$" << TMP1 << std::endl;
-		os << "\tlw\t$" << TMP1 << ",0($" << ARR_REG << ")" << std::endl; 
-		os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		if(modify)
+		{
+			os << "\tsw\t$" << ARR_REG << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		else
+		{
+			os << "\tlw\t$" << TMP1 << ",0($" << ARR_REG << ")" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 }
 void PostFixExpr::get_tag(std::string& _tag)
@@ -1483,6 +1521,14 @@ std::string PostFixExpr::get_id()
 {
 	if(post_fix_expr != NULL) {return post_fix_expr->get_id();}
 	if(prim_expr != NULL) {return prim_expr->get_id();}
+}
+void PostFixExpr::get_type(std::string& _type)
+{
+	if(expr != NULL) {_type = "array";}
+}
+void PostFixExpr::set_modify()
+{
+	modify = true; 
 }
 
 ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), arg_list(_arg_list)

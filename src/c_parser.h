@@ -395,6 +395,8 @@ public:
 	void generate_code();
 	void get_tag(std::string& _tag);
 	void get_max_arguments(int& _offset);
+	void get_type(std::string& _type);
+	void set_modify(); 
 };
 
 class PostFixExpr : public Node
@@ -405,13 +407,16 @@ private:
 	std::string op;
 	ArgList* arg_list;
 	Expr* expr; 
+	bool modify;
 public:
 	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="", ArgList* _arg_list=NULL, Expr* _expr=NULL);
 	void print();
 	void generate_code(); 
 	void get_tag(std::string& _tag); 
 	void get_max_arguments(int& _offset);
-	std::string get_id(); 
+	std::string get_id();
+	void get_type(std::string& _type);
+	void set_modify();
 };
 
 class ArgList : public Node
