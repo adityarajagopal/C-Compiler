@@ -155,13 +155,14 @@ private:
 	Declr* declr;
 	ParamList* param_list;
 	CondExpr* cond_expr;
-	int func_dec; 
+	int func_dec;
 public:
 	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL, int _fd=0, CondExpr* _cond_expr=NULL); 
 	void print(); 
 	void generate_code();
 	std::string get_id();
-	void get_tag(std::string& _tag); 
+	void get_tag(std::string& _tag);
+	void set_is_array();
 };
 
 class InitVal : public Node
@@ -408,8 +409,9 @@ private:
 	ArgList* arg_list;
 	Expr* expr; 
 	bool modify;
+	bool is_array; 
 public:
-	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="", ArgList* _arg_list=NULL, Expr* _expr=NULL);
+	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="", ArgList* _arg_list=NULL, Expr* _expr=NULL, bool _is_array=false);
 	void print();
 	void generate_code(); 
 	void get_tag(std::string& _tag); 

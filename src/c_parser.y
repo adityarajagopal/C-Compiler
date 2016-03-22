@@ -31,6 +31,7 @@ std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
 std::map<std::string, int> FuncMap;
 std::map<Tag, int> ReturnValMap;
+std::map<Tag, bool> IsArray;
 
 std::vector<Tag> Arguments;
 std::vector<int> Breaks; 
@@ -209,6 +210,7 @@ void Decl::generate_code()
 	if(init_list != NULL)
 	{
 		init_list->generate_code();
+		arr_index = 0; 
 	}
 }
 
@@ -319,6 +321,7 @@ void Declr::generate_code()
 
 	if(cond_expr != NULL)
 	{
+		declr->set_is_array();
 		//tag = set_offset();
 		cond_expr->generate_code(); 
 		std::string size_tag; 
@@ -340,6 +343,13 @@ void Declr::get_tag(std::string& _tag)
 	if(declr != NULL) {declr->get_tag(_tag);}
 	if(param_list != NULL) {param_list->get_tag(_tag);}
 	if(cond_expr != NULL) {cond_expr->get_tag(_tag);}
+}
+void Declr::set_is_array()
+{
+	if(id != "") 
+	{
+		IsArray[tag] = true;
+	}
 }
 
 InitVal::InitVal(AssExpr* _ass_expr, InitValList* _init_val_list) : ass_expr(_ass_expr), init_val_list(_init_val_list) {}
@@ -1175,7 +1185,7 @@ void JumpStat::generate_code()
 		}
 		else
 		{
-			os << "$0" << std::endl; 
+			os << "\tmove\t$2," << "$0" << std::endl; 
 		}
 		
 	}
@@ -1581,6 +1591,11 @@ void UnaryExpr::generate_code()
 			os << "\tneg\t$" << TMP1 << ",$" << TMP1 << std::endl;
 			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
+		if(unary_op == "+")
+		{
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 		if(unary_op == "~")
 		{
 			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
@@ -1624,7 +1639,7 @@ void UnaryExpr::set_modify(bool status)
 	if(post_fix_expr != NULL) {post_fix_expr->set_modify(status);}
 }
 
-PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list, Expr* _expr) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list), expr(_expr), modify(false) {}
+PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list, Expr* _expr, bool _is_array) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list), expr(_expr), modify(false), is_array(_is_array) {}
 void PostFixExpr::print()
 {
 	if(prim_expr != NULL)
@@ -1689,7 +1704,7 @@ void PostFixExpr::generate_code()
 			os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
 		}
 	}
-	if(expr != NULL)
+	if(/*expr != NULL*/is_array)
 	{
 		tag = set_offset();
 
@@ -1699,7 +1714,7 @@ void PostFixExpr::generate_code()
 		os << "\tlw\t$" << TMP1 << "," << OffsetMap[e_tag] << "($fp)" << std::endl; 
 
 		std::string pe_tag; 
-		post_fix_expr->get_tag(pe_tag); 
+		post_fix_expr->get_tag(pe_tag);
 		os << "\tla\t$" << ARR_REG << ",arr_" << OffsetMap[pe_tag] << std::endl;
 		os << "\tsll\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
 		os << "\tadd\t$" << ARR_REG << ",$" << ARR_REG << ",$" << TMP1 << std::endl;
@@ -1718,7 +1733,7 @@ void PostFixExpr::get_tag(std::string& _tag)
 {
 	if(op != "") {_tag = tag;}
 	if(arg_list != NULL) {_tag = tag;}
-	if(expr != NULL){_tag = tag;}
+	if(/*expr != NULL*/is_array){_tag = tag;}
 	if(prim_expr != NULL) {prim_expr->get_tag(_tag);}
 }
 void PostFixExpr::get_max_arguments(int& _offset)
@@ -1732,7 +1747,7 @@ std::string PostFixExpr::get_id()
 }
 void PostFixExpr::get_type(std::string& _type)
 {
-	if(expr != NULL) {_type = "array";}
+	if(/*expr != NULL*/is_array) {_type = "array";}
 }
 void PostFixExpr::set_modify(bool status)
 {
@@ -1763,12 +1778,16 @@ void ArgList::generate_code()
 		ass_expr->generate_code(); 
 		std::string ass_tag = ""; 
 		ass_expr->get_tag(ass_tag);
-		os << "\tlw\t$" << TMP1 << "," << OffsetMap[ass_tag] << "($fp)" << std::endl;
+		
+		if(IsArray[ass_tag]) {os << "\tla\t$" << TMP1 << "," << "arr_" << ass_tag << std::endl;}
+		else{os << "\tlw\t$" << TMP1 << "," << OffsetMap[ass_tag] << "($fp)" << std::endl;}
+	
 		if(num_arguments < 4)
 		{
 			os << "\tmove\t$a" << num_arguments << ",$" << TMP1 << std::endl; 
 		}
 		os << "\tsw\t$" << TMP1 << "," << num_arguments*4 << "($fp)" << std::endl;
+		
 		num_arguments++; 
 	}
 	if(arg_list != NULL){arg_list->generate_code();}
@@ -2166,11 +2185,6 @@ void IfElseExpr::generate_code()
 	std::string true_tag = ""; 
 	std::string false_tag = ""; 
 	
-	if(if_cond != NULL)
-	{
-		if_cond->generate_code();
-		if_cond->get_tag(condition_tag);
-	}
 	if(if_expr != NULL)
 	{
 		if_expr->generate_code();
@@ -2180,6 +2194,11 @@ void IfElseExpr::generate_code()
 	{
 		else_expr->generate_code();
 		else_expr->get_tag(false_tag);
+	}
+	if(if_cond != NULL)
+	{
+		if_cond->generate_code();
+		if_cond->get_tag(condition_tag);
 	}
 
 	os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[condition_tag] << "($fp)" << std::endl; 
@@ -2481,7 +2500,7 @@ postfix_expr	: primary_expr {$$ = new PostFixExpr($1);}
 				| postfix_expr LBRAC argument_list RBRAC {$$ = new PostFixExpr(NULL,$1,"",$3);}
 				| postfix_expr INC {$$ = new PostFixExpr(NULL, $1, $2);}
 				| postfix_expr DEC {$$ = new PostFixExpr(NULL, $1, $2);}
-				| postfix_expr LSQBRAC expr RSQBRAC {$$ = new PostFixExpr(NULL, $1, "", NULL, $3);}
+				| postfix_expr LSQBRAC expr RSQBRAC {$$ = new PostFixExpr(NULL, $1, "", NULL, $3,true);}
 				;
 
 argument_list 	: assign_expr {$$ = new ArgList($1);}
