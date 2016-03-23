@@ -1364,7 +1364,7 @@ void Expression::generate_code()
 			rhs->get_tag(tag_rhs);
 			rhs->get_type(rhs_type); 
 		}
-		if(rhs_type == "pointer" && lhs_type == "pointer")
+		if(IsPointer[tag_rhs] && IsPointer[tag_lhs])
 		{
 			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
 			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
@@ -1372,7 +1372,7 @@ void Expression::generate_code()
 			os << "\tsra" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
 			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
-		else if(lhs_type == "pointer")
+		else if(/*lhs_type == "pointer"*/IsPointer[tag_lhs])
 		{
 			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
 			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
@@ -1380,7 +1380,7 @@ void Expression::generate_code()
 			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
-		else if(rhs_type == "pointer")
+		else if(/*rhs_type == "pointer"*/IsPointer[tag_rhs])
 		{
 			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
 			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
@@ -1388,7 +1388,7 @@ void Expression::generate_code()
 			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
-		if(rhs_type != "pointer" && lhs_type != "pointer")
+		else if(/*rhs_type != "pointer"*/!IsPointer[tag_lhs] && /*lhs_type != "pointer"*/!IsPointer[tag_rhs])
 		{
 			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
 			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
@@ -1412,7 +1412,7 @@ void Expression::generate_code()
 			rhs->get_tag(tag_rhs);
 			rhs->get_type(rhs_type); 
 		}
-		if(rhs_type == "pointer" && lhs_type == "pointer")
+		if(IsPointer[tag_rhs] && IsPointer[tag_lhs])
 		{
 			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
 			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
@@ -1420,7 +1420,7 @@ void Expression::generate_code()
 			os << "\tsra" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
 			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
-		else if(lhs_type == "pointer")
+		else if(/*lhs_type == "pointer"*/IsPointer[tag_lhs])
 		{
 			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
 			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
@@ -1428,7 +1428,7 @@ void Expression::generate_code()
 			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
-		else if(rhs_type == "pointer")
+		else if(/*rhs_type == "pointer"*/IsPointer[tag_rhs])
 		{
 			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
 			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
@@ -1436,7 +1436,7 @@ void Expression::generate_code()
 			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
 			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
-		if(rhs_type != "pointer" && lhs_type != "pointer")
+		else if(/*rhs_type != "pointer"*/!IsPointer[tag_lhs] && /*lhs_type != "pointer"*/!IsPointer[tag_rhs])
 		{
 			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
 			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
@@ -1876,7 +1876,7 @@ void UnaryExpr::get_type(std::string& _type)
 }
 void UnaryExpr::set_modify(bool status)
 {
-	if(unary_op == "*") {modify = status;}
+	//if(unary_op == "*") {modify = status;}
 	if(post_fix_expr != NULL) {post_fix_expr->set_modify(status);}
 }
 void UnaryExpr::get_value(int& _value)
