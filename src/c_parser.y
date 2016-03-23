@@ -275,13 +275,16 @@ void InitDeclr::generate_code()
 	if(init_val != NULL)
 	{
 		if(declr != NULL) declr->get_tag(lhs_tag); 
-		init_val->get_tag(rhs_tag); 
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		init_val->get_tag(rhs_tag);
+		if(!IsArray[lhs_tag])
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		}
 	}
 }
 
-Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list, int _fd, CondExpr* _cond_expr) : id(_id), declr(_declr), param_list(_param_list), func_dec(_fd), cond_expr(_cond_expr) {}
+Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list, int _fd, CondExpr* _cond_expr, bool _is_array) : id(_id), declr(_declr), param_list(_param_list), func_dec(_fd), cond_expr(_cond_expr), is_array(_is_array) {}
 
 void Declr::print()
 {
@@ -319,17 +322,32 @@ void Declr::generate_code()
 
 	if(declr != NULL){declr->generate_code();}
 
-	if(cond_expr != NULL)
+	if(/*cond_expr != NULL*/is_array)
 	{
+		int size; 
 		declr->set_is_array();
 		//tag = set_offset();
-		cond_expr->generate_code(); 
-		std::string size_tag; 
-		declr->get_tag(size_tag); 
+		if(cond_expr != NULL) 
+		{
+			cond_expr->generate_code(); 
+			cond_expr->get_value(size);
+		}
+		std::string array_tag; 
+		declr->get_tag(array_tag); 
 		//os << "\tlw\t$" << TMP1 << "," << OffsetMap[size_tag] << "($fp)" << std::endl;
-		ArrayLabel << std::endl << "arr_" << OffsetMap[size_tag] << ":\t" << ".word"; 
-		os << "\tla\t$" << ARR_REG << "," << "arr_" << OffsetMap[size_tag] << std::endl; 
-		//os << "\tsw\t$" << ARR_REG << "," << OffsetMap[size_tag] << "($fp)" << std::endl;
+		if(cond_expr != NULL)
+		{
+			ArrayLabel << std::endl << "arr_" << OffsetMap[array_tag] << ":\t" << ".word\t"; 
+			os << "\tla\t$" << ARR_REG << "," << "arr_" << OffsetMap[array_tag] << std::endl; 
+			//os << "\tsw\t$" << ARR_REG << "," << OffsetMap[size_tag] << "($fp)" << std::endl;
+			os << "\tsw\t$" << ARR_REG << "," << OffsetMap[array_tag] << "($fp)" << std::endl;
+
+			for(int i=0; i<size-1; i++)
+			{
+				ArrayLabel << "0,";
+			}
+			ArrayLabel << "0";
+		}
 	}
 }
 std::string Declr::get_id()
@@ -387,7 +405,7 @@ void InitValList::generate_code()
 		init_val->get_tag(arr_tag);
 		os << "\tlw\t$" << TMP1 << "," << OffsetMap[arr_tag]  << "($fp)" << std::endl;
 		os << "\tsw\t$" << TMP1 << "," << arr_index*4 << "($" << ARR_REG << ")" << std::endl;
-		ArrayLabel << "\t0,"; 
+		//ArrayLabel << "\t0,"; 
 		arr_index++;
 	}
 
@@ -491,6 +509,10 @@ void AssExpr::generate_code()
 	
 	if(cond_expr != NULL)
 	{
+		//std::string type = "";
+		//if(cond_expr != NULL) {cond_expr->get_type(type);}
+		//os << type << std::endl; 
+		//if(type == "array") {cond_expr->set_modify(true);}
 		cond_expr->generate_code(); 
 	}
 
@@ -879,8 +901,10 @@ void AssExpr::generate_code()
 			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
 	}
+		
+	if(cond_expr != NULL){cond_expr->set_modify(false);}
+	if(unary_expr != NULL){unary_expr->set_modify(false);}
 
-	if(unary_expr != NULL) {unary_expr->set_modify(false);}
 }
 void AssExpr::get_tag(std::string& _tag)
 {
@@ -961,6 +985,18 @@ void CondExpr::get_max_arguments(int& _offset)
 {
 	if(expression != NULL) {expression->get_max_arguments(_offset);}	
 }
+void CondExpr::get_value(int& _value)
+{
+	if(expression != NULL) {expression->get_value(_value);}
+}
+void CondExpr::get_type(std::string& _type)
+{
+	if(expression != NULL) {expression->get_type(_type);}
+}
+void CondExpr::set_modify(bool status)
+{
+	if(expression != NULL) {expression->set_modify(status);}
+}
 
 PrimExpr::PrimExpr(std::string _value, int _flag, Expr* _e) : value(_value), expr(_e), flag(_flag) {}
 void PrimExpr::print()
@@ -1028,16 +1064,19 @@ void PrimExpr::generate_code()
  		switch(flag)
 		{
 			case 1:
+				literal = std::stoi(value,NULL,10);	
 				os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
 				os << "\tli" << "\t$" << TMP1 << "," << std::stoi(value,NULL,10) << std::endl;
 				os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 2:
+				literal = std::stoi(value,NULL,8);
 				os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
 				os << "\tli" << "\t$" << TMP1 << "," << std::stoi(value,NULL,8) << std::endl;  
 				os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 3: 
+				literal = std::stoi(value,NULL,16);
 				os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
 				os << "\tli" << "\t$" << TMP1 << "," << std::stoi(value,NULL,16) << std::endl;  
 				os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
@@ -1057,6 +1096,10 @@ void PrimExpr::get_tag(std::string& _tag)
 std::string PrimExpr::get_id()
 {
 	return value; 
+}
+void PrimExpr::get_value(int& _value)
+{
+	_value = literal;
 }
 
 
@@ -1170,7 +1213,7 @@ void Stat::generate_code()
 }
 */
 
-JumpStat::JumpStat(Expr* _expr, std::string _type) : expr(_expr), type(_type) {} 
+JumpStat::JumpStat(Expr* _expr, std::string _type, std::string _id) : expr(_expr), type(_type), id(_id) {} 
 void JumpStat::generate_code()
 {
 	if(type == "return")
@@ -1193,6 +1236,13 @@ void JumpStat::generate_code()
 	if(type == "break")
 	{
 		os << "\tj\t" << "break_" << Breaks.back() << std::endl;  
+		os << "\tnop" << std::endl; 
+	}
+
+	if(type == "goto")
+	{
+		os << "\tj\t" << "tag_" << id << std::endl; 
+		os << "\tnop" << std::endl;
 	}
 }
 void JumpStat::get_max_arguments(int& _offset) 
@@ -1540,6 +1590,24 @@ void Expression::get_max_arguments(int& _offset)
 		*/
 	}
 }
+void Expression::get_value(int& _value)
+{
+	if(lhs != NULL) {lhs->get_value(_value);}
+	if(rhs != NULL) {rhs->get_value(_value);}
+	if(unary_expr != NULL) {unary_expr->get_value(_value);}
+}
+void Expression::get_type(std::string& _type)
+{
+	if(lhs != NULL) {lhs->get_type(_type);}
+	if(rhs != NULL) {rhs->get_type(_type);}
+	if(unary_expr != NULL) {unary_expr->get_type(_type);}
+}
+void Expression::set_modify(bool status)
+{
+	if(lhs != NULL) {lhs->set_modify(status);}
+	if(rhs != NULL) {rhs->set_modify(status);}
+	if(unary_expr != NULL) {unary_expr->set_modify(status);}
+}
 
 UnaryExpr::UnaryExpr(PostFixExpr* _post_fix_expr, UnaryExpr* _unary_expr, std::string _unary_op) : post_fix_expr(_post_fix_expr), unary_expr(_unary_expr), unary_op(_unary_op) {}
 void UnaryExpr::print()
@@ -1563,6 +1631,18 @@ void UnaryExpr::generate_code()
 {
 	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
 	
+	if(unary_expr != NULL && (unary_op == "++" || unary_op == "--")) 
+	{
+		std::string type = "";
+		unary_expr->get_type(type);
+		//os << type << std::endl; 
+		if(type == "array") 
+		{
+			unary_expr->set_modify(true);
+			//post_fix_expr->generate_code();
+		}
+	}
+	
 	if(unary_expr != NULL)
 	{
 		tag = set_offset(); 
@@ -1573,17 +1653,57 @@ void UnaryExpr::generate_code()
 
 		if(unary_op == "++")
 		{
-			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			unary_expr->set_inc_dec(true);
+			std::string rhs_tag;
+			if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
+			
+			if(!IsArray[rhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			}
+			else
+			{
+				unary_expr->set_inc_dec(false);
+				std::string rhs_tag; 
+				if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
+
+				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",1" << std::endl; 
+				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  
+				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+			}
 		}
+
 		if(unary_op == "--")
 		{
-			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			unary_expr->set_inc_dec(true);
+			std::string rhs_tag;
+			if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
+		
+			if(!IsArray[rhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+			}
+			else
+			{
+				unary_expr->set_inc_dec(false);
+				std::string rhs_tag; 
+				if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
+
+				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",-1" << std::endl; 
+				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  
+				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+			}
+
 		}
 		if(unary_op == "-")
 		{
@@ -1638,8 +1758,17 @@ void UnaryExpr::set_modify(bool status)
 {
 	if(post_fix_expr != NULL) {post_fix_expr->set_modify(status);}
 }
+void UnaryExpr::get_value(int& _value)
+{
+	if(post_fix_expr != NULL) {post_fix_expr->get_value(_value);}
+	if(unary_expr != NULL) {unary_expr->get_value(_value);}
+}
+void UnaryExpr::set_inc_dec(bool status)
+{
+	if(post_fix_expr != NULL) {post_fix_expr->set_inc_dec(status);}
+}
 
-PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list, Expr* _expr, bool _is_array) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list), expr(_expr), modify(false), is_array(_is_array) {}
+PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list, Expr* _expr, bool _is_array) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list), expr(_expr), modify(false), is_array(_is_array), parent_inc_dec(false) {}
 void PostFixExpr::print()
 {
 	if(prim_expr != NULL)
@@ -1658,6 +1787,19 @@ void PostFixExpr::print()
 void PostFixExpr::generate_code()
 {
 	if(prim_expr != NULL){prim_expr->generate_code();}
+	
+	if(post_fix_expr != NULL && op != "") 
+	{
+		std::string type = "";
+		post_fix_expr->get_type(type);
+		//os << type << std::endl; 
+		if(type == "array") 
+		{
+			post_fix_expr->set_modify(true);
+			//post_fix_expr->generate_code();
+		}
+	}
+
 	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
 	if(arg_list != NULL) 
 	{
@@ -1688,20 +1830,59 @@ void PostFixExpr::generate_code()
 		std::cerr << "OP: " << op << std::endl; 
 		std::cerr << "LHS: " << lhs_tag << std::endl;
 		std::cerr << std::endl;
+	
 
 		if(op == "++")
 		{
-			os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
+			post_fix_expr->set_inc_dec(true);
+			std::string lhs_tag;
+			if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+
+			if(!IsArray[lhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			}
+			else
+			{
+				post_fix_expr->set_inc_dec(false);
+				std::string lhs_tag; 
+				if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+
+				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",1" << std::endl; 
+				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+			}
 		}
 		if(op == "--")
 		{
-			os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
+			post_fix_expr->set_inc_dec(true);
+			std::string lhs_tag;
+			if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+			
+			if(!IsArray[lhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			}
+			else
+			{
+				post_fix_expr->set_inc_dec(false);
+				std::string lhs_tag; 
+				if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+				
+				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",-1" << std::endl; 
+				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  
+			}
 		}
 	}
 	if(/*expr != NULL*/is_array)
@@ -1715,7 +1896,8 @@ void PostFixExpr::generate_code()
 
 		std::string pe_tag; 
 		post_fix_expr->get_tag(pe_tag);
-		os << "\tla\t$" << ARR_REG << ",arr_" << OffsetMap[pe_tag] << std::endl;
+		//os << "\tla\t$" << ARR_REG << ",arr_" << OffsetMap[pe_tag] << std::endl;
+		os << "\tlw\t$" << ARR_REG << "," << OffsetMap[pe_tag] << "($fp)" << std::endl; 
 		os << "\tsll\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
 		os << "\tadd\t$" << ARR_REG << ",$" << ARR_REG << ",$" << TMP1 << std::endl;
 		if(modify)
@@ -1733,7 +1915,12 @@ void PostFixExpr::get_tag(std::string& _tag)
 {
 	if(op != "") {_tag = tag;}
 	if(arg_list != NULL) {_tag = tag;}
-	if(/*expr != NULL*/is_array){_tag = tag;}
+	if(is_array && parent_inc_dec) {post_fix_expr->get_tag(_tag);}
+	if(is_array && !parent_inc_dec)
+	{
+		_tag = tag;
+		//parent_inc_dec = 0; 
+	}
 	if(prim_expr != NULL) {prim_expr->get_tag(_tag);}
 }
 void PostFixExpr::get_max_arguments(int& _offset)
@@ -1747,11 +1934,22 @@ std::string PostFixExpr::get_id()
 }
 void PostFixExpr::get_type(std::string& _type)
 {
-	if(/*expr != NULL*/is_array) {_type = "array";}
+	//if(op != "") {post_fix_expr->get_type(_type);}
+	if(is_array) {_type = "array";}
 }
 void PostFixExpr::set_modify(bool status)
 {
-	modify = status; 
+	//if(op != "") {post_fix_expr->set_modify(status);}
+	/*else {*/modify = status;//} 
+}
+void PostFixExpr::get_value(int& _value)
+{
+	if(prim_expr != NULL) {prim_expr->get_value(_value);}
+	if(post_fix_expr != NULL) {post_fix_expr->get_value(_value);}
+}
+void PostFixExpr::set_inc_dec(bool status)
+{
+	parent_inc_dec = status;
 }
 
 ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), arg_list(_arg_list)
@@ -1779,8 +1977,8 @@ void ArgList::generate_code()
 		std::string ass_tag = ""; 
 		ass_expr->get_tag(ass_tag);
 		
-		if(IsArray[ass_tag]) {os << "\tla\t$" << TMP1 << "," << "arr_" << ass_tag << std::endl;}
-		else{os << "\tlw\t$" << TMP1 << "," << OffsetMap[ass_tag] << "($fp)" << std::endl;}
+		/*if(IsArray[ass_tag]) {os << "\tla\t$" << TMP1 << "," << "arr_" << OffsetMap[ass_tag] << std::endl;}*/
+		/*else{*/os << "\tlw\t$" << TMP1 << "," << OffsetMap[ass_tag] << "($fp)" << std::endl;//}
 	
 		if(num_arguments < 4)
 		{
@@ -2351,8 +2549,8 @@ statement		: compound_statement {}
 declarator		: IDENTIFIER {$$ = new Declr($1);} 
 				| declarator LBRAC param_list RBRAC {$$ = new Declr("", $1, $3, 1);} 
 				| declarator LBRAC RBRAC {$$ = new Declr("", $1, NULL, 1);}
-				| declarator LSQBRAC conditional_expr RSQBRAC {$$ = new Declr("",$1,NULL,0,$3);}
-				| declarator LSQBRAC RSQBRAC {$$ = new Declr("",$1,NULL,0,NULL);}
+				| declarator LSQBRAC conditional_expr RSQBRAC {$$ = new Declr("",$1,NULL,0,$3,true);}
+				| declarator LSQBRAC RSQBRAC {$$ = new Declr("",$1,NULL,0,NULL,true);}
 				;
 
 param_list		: param_decl {$$ = new ParamList($1);}
@@ -2394,7 +2592,7 @@ expr_statement 	: SEMICOLON {$$ = new ExprStat();}
 				| expr SEMICOLON {$$ = new ExprStat($1);}
 				;
 
-jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON {} 
+jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON {$$ = new JumpStat(NULL,"goto",$2);} 
 				| RETURN SEMICOLON {$$ = new JumpStat(NULL, "return");}
 				| RETURN expr SEMICOLON {$$ = new JumpStat($2, "return");}
 				| BREAK SEMICOLON {$$ = new JumpStat(NULL, "break");}

@@ -156,8 +156,9 @@ private:
 	ParamList* param_list;
 	CondExpr* cond_expr;
 	int func_dec;
+	bool is_array; 
 public:
-	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL, int _fd=0, CondExpr* _cond_expr=NULL); 
+	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL, int _fd=0, CondExpr* _cond_expr=NULL, bool _is_array=false); 
 	void print(); 
 	void generate_code();
 	std::string get_id();
@@ -240,6 +241,9 @@ public:
 	void get_tag(std::string& _tag);
 	void generate_code();
 	void get_max_arguments(int& _offset);
+	void get_value(int& _value);
+	void get_type(std::string& _type);
+	void set_modify(bool status);
 };
 
 class IfElseExpr : public Node
@@ -259,6 +263,7 @@ class PrimExpr : public Node
 {
 private:
 	std::string value;
+	int literal;
 	int flag;
 	Expr* expr;
 public:
@@ -267,6 +272,7 @@ public:
 	void generate_code();
 	void get_tag(std::string& _tag);
 	std::string get_id();
+	void get_value(int& _value);
 };
 
 class CompStat : public Node
@@ -325,8 +331,9 @@ class JumpStat : public Node
 private: 
 	Expr* expr;
 	std::string type;
+	std::string id; 
 public: 
-	JumpStat(Expr* _expr, std::string _type); 
+	JumpStat(Expr* _expr=NULL, std::string _type="", std::string _id=""); 
 	void generate_code();
 	void print() {};
 	void get_max_arguments(int& _offset); 
@@ -382,6 +389,9 @@ public:
 	void print(); 
 	void generate_code();
 	void get_max_arguments(int& _offset);
+	void get_value(int& _value);
+	void get_type(std::string& _type);
+	void set_modify(bool status);
 };
 
 class UnaryExpr : public Node
@@ -397,7 +407,9 @@ public:
 	void get_tag(std::string& _tag);
 	void get_max_arguments(int& _offset);
 	void get_type(std::string& _type);
-	void set_modify(bool status); 
+	void set_modify(bool status);
+	void get_value(int& _value);
+	void set_inc_dec(bool status);
 };
 
 class PostFixExpr : public Node
@@ -409,7 +421,8 @@ private:
 	ArgList* arg_list;
 	Expr* expr; 
 	bool modify;
-	bool is_array; 
+	bool is_array;
+	bool parent_inc_dec;
 public:
 	PostFixExpr(PrimExpr* _prim_expr=NULL, PostFixExpr* _post_fix_expr=NULL, std::string _op="", ArgList* _arg_list=NULL, Expr* _expr=NULL, bool _is_array=false);
 	void print();
@@ -419,6 +432,8 @@ public:
 	std::string get_id();
 	void get_type(std::string& _type);
 	void set_modify(bool status);
+	void get_value(int& _value);
+	void set_inc_dec(bool status);
 };
 
 class ArgList : public Node
