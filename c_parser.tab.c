@@ -69,6 +69,8 @@
 #define TMP1 8
 #define TMP2 9
 #define TMP3 10
+#define ARR_REG 11
+#define CASE_REG 12
 
 int yylex();
 int yyerror(const char* s);
@@ -82,17 +84,24 @@ int arg_reg = 4;
 int glbl_loop_num = 0;
 int glbl_selec_num = 0;
 int num_arguments = 0;
-int is_func_dec = 0; 
+int num_parameters = 0;
+int arr_index = 0;
+int case_num = 0;
+int break_num = 0; 
 
+bool cases = true;
 
 std::map<Tag, int> OffsetMap;
 std::map<std::string, std::vector<Tag> > VarTagMap;
 std::map<std::string, int> FuncMap;
 std::map<Tag, int> ReturnValMap;
+std::map<Tag, bool> IsArray;
+std::map<Tag, bool> IsPointer;
 
 std::vector<Tag> Arguments;
+std::vector<int> Breaks; 
 
-std::stringstream TUnit , Hdr, SetupFp, os, RestoreFp, Ftr, FuncInit;  
+std::stringstream TUnit , Hdr, SetupFp, os, RestoreFp, Ftr, FuncInit, ArrayLabel;  
 
 std::string set_offset()
 {
@@ -126,7 +135,8 @@ void File::generate_code()
 	
 	Hdr.str(""); 
 	SetupFp.str("");
-	os.str(""); 
+	os.str("");
+	FuncInit.str("");
 	RestoreFp.str(""); 
 	Ftr.str(""); 
 	
@@ -178,8 +188,7 @@ void FuncDef::generate_code()
 	{
 		offset=0;
 		comp_stat->get_max_arguments(offset);
-		std::cerr << "function: " << declr->get_id() << std::endl; 
-		std::cerr << "OFFSET: " << offset << std::endl; 
+		std::cerr << "ARGUMETNS: " << offset << std::endl; 
 		if(offset < 4) {offset = 16;}
 		else {offset = offset * 4;}
 	}
@@ -187,7 +196,6 @@ void FuncDef::generate_code()
 	{
 		offset = 16;
 	}
-
 
 	Hdr << "\t" << ".align\t2" << std::endl; 
 	Hdr << "\t" << ".globl\t" << declr->get_id();
@@ -198,18 +206,21 @@ void FuncDef::generate_code()
 	Hdr << declr->get_id();  
 	Hdr << ":" << std::endl;
 
+	Arguments.clear();
+	
 	if(declr != NULL)
 	{
 		global_scope++;
 		declr->generate_code(); 
 		global_scope--;
 	}
-	
+
 	if(comp_stat != NULL)
 	{
 		comp_stat->generate_code();
 	}
 	
+	offset+=12; //accounting for frame pointer and return address 
 	for(int i=0; i<Arguments.size(); i++)
 	{
 		if(i<4)
@@ -222,17 +233,16 @@ void FuncDef::generate_code()
 			FuncInit << "\tsw\t$" << TMP1 << "," << OffsetMap[Arguments[i]] << "($fp)" << std::endl; 	
 		}
 	}
-	Arguments.clear(); 
 
-	SetupFp << "\taddiu\t$sp,$sp,-" << offset+12 << std::endl;
-	SetupFp << "\tsw\t$fp," << offset+4 << "($sp)" << std::endl;
-	SetupFp << "\tsw\t$31," << offset+8 << "($sp)" << std::endl;
+	SetupFp << "\taddiu\t$sp,$sp,-" << offset << std::endl;
+	SetupFp << "\tsw\t$fp," << offset-8 << "($sp)" << std::endl;
+	SetupFp << "\tsw\t$31," << offset-4 << "($sp)" << std::endl;
 	SetupFp << "\tmove\t$fp,$sp" << std::endl;
 
 	RestoreFp << "\tmove\t$sp,$fp" << std::endl; 
-	RestoreFp << "\tlw\t$fp," << offset+4 << "($sp)" << std::endl; 
-	RestoreFp << "\tlw\t$31," << offset+8 << "($sp)" << std::endl;
-	RestoreFp << "\taddiu\t$sp,$sp," << offset+12 << std::endl; 
+	RestoreFp << "\tlw\t$fp," << offset-8 << "($sp)" << std::endl; 
+	RestoreFp << "\tlw\t$31," << offset-4 << "($sp)" << std::endl;
+	RestoreFp << "\taddiu\t$sp,$sp," << offset << std::endl; 
 	RestoreFp << "\tj\t" << "$31" << std::endl;
 	RestoreFp << "\tnop" << std::endl; 
 
@@ -261,10 +271,11 @@ void Decl::print()
 }
 void Decl::generate_code()
 {
+	//is_func_dec = 1;
 	if(init_list != NULL)
 	{
 		init_list->generate_code();
-		is_func_dec = 1;
+		arr_index = 0; 
 	}
 }
 
@@ -329,13 +340,16 @@ void InitDeclr::generate_code()
 	if(init_val != NULL)
 	{
 		if(declr != NULL) declr->get_tag(lhs_tag); 
-		init_val->get_tag(rhs_tag); 
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		init_val->get_tag(rhs_tag);
+		if(!IsArray[lhs_tag])
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+		}
 	}
 }
 
-Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list, int _fd) : id(_id), declr(_declr), param_list(_param_list), func_dec(_fd) {}
+Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list, int _fd, CondExpr* _cond_expr, bool _is_array, Pointer* _pointer) : id(_id), declr(_declr), param_list(_param_list), func_dec(_fd), cond_expr(_cond_expr), is_array(_is_array), pointer(_pointer) {}
 
 void Declr::print()
 {
@@ -356,8 +370,7 @@ void Declr::print()
 }
 void Declr::generate_code()
 {
-	if(param_list != NULL && is_func_dec == 0){param_list->generate_code();}
-	else {is_func_dec = 0;}
+	if(param_list != NULL){param_list->generate_code();}
 	
 	if(id != "")
 	{
@@ -372,7 +385,45 @@ void Declr::generate_code()
 		std::cerr << std::endl; 
 	}
 
-	if(declr != NULL && func_dec == 0){declr->generate_code();}
+	if(declr != NULL){declr->generate_code();}
+
+	if(/*cond_expr != NULL*/is_array)
+	{
+		int size; 
+		declr->set_is_array();
+		//tag = set_offset();
+		if(cond_expr != NULL) 
+		{
+			cond_expr->generate_code(); 
+			cond_expr->get_value(size);
+		}
+		std::string array_tag; 
+		declr->get_tag(array_tag); 
+		//os << "\tlw\t$" << TMP1 << "," << OffsetMap[size_tag] << "($fp)" << std::endl;
+		if(cond_expr != NULL)
+		{
+			ArrayLabel << std::endl << "arr_" << OffsetMap[array_tag] << ":\t" << ".word\t"; 
+			os << "\tla\t$" << ARR_REG << "," << "arr_" << OffsetMap[array_tag] << std::endl; 
+			//os << "\tsw\t$" << ARR_REG << "," << OffsetMap[size_tag] << "($fp)" << std::endl;
+			os << "\tsw\t$" << ARR_REG << "," << OffsetMap[array_tag] << "($fp)" << std::endl;
+
+			for(int i=0; i<size-1; i++)
+			{
+				ArrayLabel << "0,";
+			}
+			ArrayLabel << "0";
+		}
+	}
+
+	if(pointer != NULL)
+	{
+		std::string d_tag; 
+		if(declr != NULL) 
+		{
+			declr->get_tag(d_tag);
+		}
+		IsPointer[d_tag] = true; 	
+	}
 }
 std::string Declr::get_id()
 {
@@ -384,9 +435,19 @@ void Declr::get_tag(std::string& _tag)
 	if(id != "") {_tag = tag;}
 	if(declr != NULL) {declr->get_tag(_tag);}
 	if(param_list != NULL) {param_list->get_tag(_tag);}
+	if(cond_expr != NULL) {cond_expr->get_tag(_tag);}
+}
+void Declr::set_is_array()
+{
+	if(id != "") 
+	{
+		IsArray[tag] = true;
+	}
 }
 
-InitVal::InitVal(AssExpr* _ass_expr) : ass_expr(_ass_expr) {}
+Pointer::Pointer(Pointer* _pointer) : pointer(_pointer) {}
+
+InitVal::InitVal(AssExpr* _ass_expr, InitValList* _init_val_list) : ass_expr(_ass_expr), init_val_list(_init_val_list) {}
 void InitVal::print()
 {
 	if(ass_expr != NULL)
@@ -396,11 +457,44 @@ void InitVal::print()
 }
 void InitVal::generate_code()
 {
-	if(ass_expr != NULL){ass_expr->generate_code();}
+	if(ass_expr != NULL)
+	{
+		ass_expr->generate_code();
+	}
+	if(init_val_list != NULL) 
+	{
+		init_val_list->generate_code();
+	}
 }
 void InitVal::get_tag(std::string& _tag)
 {
 	if(ass_expr != NULL) {ass_expr->get_tag(_tag);}
+	if(init_val_list != NULL) {init_val_list->get_tag(_tag);}
+}
+
+InitValList::InitValList(InitVal* _init_val, InitValList* _init_val_list) : init_val(_init_val), init_val_list(_init_val_list) {}
+void InitValList::generate_code()
+{
+	if(init_val != NULL)
+	{
+		init_val->generate_code();
+		std::string arr_tag; 
+		init_val->get_tag(arr_tag);
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[arr_tag]  << "($fp)" << std::endl;
+		os << "\tsw\t$" << TMP1 << "," << arr_index*4 << "($" << ARR_REG << ")" << std::endl;
+		//ArrayLabel << "\t0,"; 
+		arr_index++;
+	}
+
+	if(init_val_list != NULL)
+	{
+		init_val_list->generate_code();
+	}
+}
+void InitValList::get_tag(std::string& _tag)
+{
+	if(init_val != NULL) {init_val->get_tag(_tag);}
+	if(init_val_list != NULL){init_val_list->get_tag(_tag);}
 }
 
 ParamList::ParamList(ParamDecl* _param_decl, ParamList* _param_list) : param_decl(_param_decl), param_list(_param_list) {}
@@ -417,7 +511,7 @@ void ParamList::print()
 }
 void ParamList::generate_code()
 {
-	if(param_decl != NULL) {param_decl->generate_code();}
+	if(param_decl != NULL) {param_decl->generate_code(); num_parameters++;}
 	if(param_list != NULL) {param_list->generate_code();}
 }
 void ParamList::get_tag(std::string& _tag)
@@ -442,16 +536,6 @@ void ParamDecl::generate_code()
 {
 	if(declr != NULL) 
 	{
-		/*
-		declr->generate_code();
-		std::string d_tag; 
-		declr->get_tag(d_tag); 
-		os << "\tlw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
-		os << "move\t$" << TMP1 << ",$" << arg_reg << std::endl; 
-		os << "\tsw\t$" << TMP1 << "," << OffsetMap[d_tag] << "($fp)" << std::endl; 
-		
-		arg_reg++; 
-		*/
 		declr->generate_code(); 
 		std::string d_tag;
 		declr->get_tag(d_tag);
@@ -463,10 +547,7 @@ void ParamDecl::get_tag(std::string& _tag)
 	if(declr != NULL) {declr->get_tag(_tag);}
 }
 
-AssExpr::AssExpr(CondExpr* _cond_expr, UnaryExpr* _unary_expr, std::string _ass_oper, AssExpr* _ass_expr) : cond_expr(_cond_expr), unary_expr(_unary_expr), ass_oper(_ass_oper), ass_expr(_ass_expr) 
-{
-	/*if(ass_oper != "") {tag = set_offset();}*/
-}
+AssExpr::AssExpr(CondExpr* _cond_expr, UnaryExpr* _unary_expr, std::string _ass_oper, AssExpr* _ass_expr) : cond_expr(_cond_expr), unary_expr(_unary_expr), ass_oper(_ass_oper), ass_expr(_ass_expr) {}
 void AssExpr::print()
 {
 	if(cond_expr != NULL)
@@ -505,11 +586,18 @@ void AssExpr::generate_code()
 	
 	if(cond_expr != NULL)
 	{
+		//std::string type = "";
+		//if(cond_expr != NULL) {cond_expr->get_type(type);}
+		//os << type << std::endl; 
+		//if(type == "array") {cond_expr->set_modify(true);}
 		cond_expr->generate_code(); 
 	}
 
 	if(unary_expr != NULL)
 	{
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array") {unary_expr->set_modify(true);}
 		unary_expr->generate_code();
 	}
 	
@@ -520,152 +608,380 @@ void AssExpr::generate_code()
 	
 	if(ass_oper == "+=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\tadd\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 	
 	if(ass_oper == "=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw\t$" << TMP1 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
 	}
 	
 	
 	else if(ass_oper == "-=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\tsub\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 	
 	else if(ass_oper == "*=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tmul" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tnop" << std::endl; 
-		os << "\tnop" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\tmul\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tnop" << std::endl;
+			os << "\tnop" << std::endl; 
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tmul" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tnop" << std::endl; 
+			os << "\tnop" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 	
 	else if(ass_oper == "/=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tdiv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tnop" << std::endl;
-		os << "\tnop" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\tdiv\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tnop" << std::endl; 
+			os << "\tnop" << std::endl;
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tdiv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tnop" << std::endl;
+			os << "\tnop" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 
 	else if(ass_oper == "%=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\trem" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tnop" << std::endl; 
-		os << "\tnop" << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\trem\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tnop" << std::endl; 
+			os << "\tnop" << std::endl; 
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\trem" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tnop" << std::endl; 
+			os << "\tnop" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 
 	else if(ass_oper == "<<=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tsllv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\tsllv\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tsllv" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 
 	else if(ass_oper == ">>=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tsrav" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\tsrav\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tsrav" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 
 	else if(ass_oper == "&=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tand" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\tand\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tand" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 
 	else if(ass_oper == "^=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\txor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\txor\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\txor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 
 	else if(ass_oper == "|=")
 	{
-		lhs_tag="";
-		rhs_tag="";
-		unary_expr->get_tag(lhs_tag);
-		ass_expr->get_tag(rhs_tag);
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-		os << "\tor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string type; 
+		if(unary_expr != NULL) {unary_expr->get_type(type);}
+		if(type == "array" || type == "pointer")
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+			os << "\tor\t$" << TMP3 << ",$" << TMP3 << ",$" << TMP1 << std::endl; 
+			os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+
+			os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
+		else
+		{
+			lhs_tag="";
+			rhs_tag="";
+			unary_expr->get_tag(lhs_tag);
+			ass_expr->get_tag(rhs_tag);
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tor" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
+		
+	if(cond_expr != NULL){cond_expr->set_modify(false);}
+	if(unary_expr != NULL){unary_expr->set_modify(false);}
+
 }
 void AssExpr::get_tag(std::string& _tag)
 {
@@ -676,9 +992,44 @@ void AssExpr::get_tag(std::string& _tag)
 }
 void AssExpr::get_max_arguments(int& _offset)
 {
-	if(cond_expr != NULL) {cond_expr->get_max_arguments(_offset);}
-	if(unary_expr != NULL) {unary_expr->get_max_arguments(_offset);}
-	if(ass_expr != NULL) {ass_expr->get_max_arguments(_offset);}
+	int ce=0, ue=0, ae=0; 
+	std::vector<int> tmp; 
+	if(cond_expr != NULL) 
+	{
+		cond_expr->get_max_arguments(ce);
+		tmp.push_back(ce); 
+	}
+	if(unary_expr != NULL) 
+	{
+		unary_expr->get_max_arguments(ue);
+		tmp.push_back(ue); 
+	}
+	if(ass_expr != NULL) 
+	{
+		ass_expr->get_max_arguments(ae);
+		tmp.push_back(ae); 
+	}
+	
+	if(!tmp.empty())
+	{
+		std::vector<int>::iterator i1; 
+		i1 = std::max_element(tmp.begin(), tmp.end());
+		std::cerr << "MAX1: " << *i1 << std::endl; 
+		_offset = *i1;
+		/*
+		int max = tmp[0]; 
+		for(int i=0; i<tmp.size(); i++)
+		{
+			std::cerr << tmp[i] << std::endl; 
+			if(tmp[i] > max) 
+			{
+				max = tmp[i]; 
+			}
+		}
+		std::cerr << "MAX1: " << max << std::endl; 
+		_offset = max;
+		*/
+	}
 }
 
 CondExpr::CondExpr(Expression* _expression, IfElseExpr* _ie_expr) : expression(_expression), ie_expr(_ie_expr)
@@ -710,6 +1061,18 @@ void CondExpr::get_tag(std::string& _tag)
 void CondExpr::get_max_arguments(int& _offset)
 {
 	if(expression != NULL) {expression->get_max_arguments(_offset);}	
+}
+void CondExpr::get_value(int& _value)
+{
+	if(expression != NULL) {expression->get_value(_value);}
+}
+void CondExpr::get_type(std::string& _type)
+{
+	if(expression != NULL) {expression->get_type(_type);}
+}
+void CondExpr::set_modify(bool status)
+{
+	if(expression != NULL) {expression->set_modify(status);}
 }
 
 PrimExpr::PrimExpr(std::string _value, int _flag, Expr* _e) : value(_value), expr(_e), flag(_flag) {}
@@ -778,16 +1141,19 @@ void PrimExpr::generate_code()
  		switch(flag)
 		{
 			case 1:
+				literal = std::stoi(value,NULL,10);	
 				os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
 				os << "\tli" << "\t$" << TMP1 << "," << std::stoi(value,NULL,10) << std::endl;
 				os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 2:
+				literal = std::stoi(value,NULL,8);
 				os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
 				os << "\tli" << "\t$" << TMP1 << "," << std::stoi(value,NULL,8) << std::endl;  
 				os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
 				break;
 			case 3: 
+				literal = std::stoi(value,NULL,16);
 				os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl; 
 				os << "\tli" << "\t$" << TMP1 << "," << std::stoi(value,NULL,16) << std::endl;  
 				os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[VarTagMap[value][index]] << "($fp)" << std::endl;
@@ -807,6 +1173,10 @@ void PrimExpr::get_tag(std::string& _tag)
 std::string PrimExpr::get_id()
 {
 	return value; 
+}
+void PrimExpr::get_value(int& _value)
+{
+	_value = literal;
 }
 
 
@@ -828,6 +1198,7 @@ void CompStat::print()
 void CompStat::generate_code()
 {
 	global_scope++;
+
 	if(decl_list != NULL){decl_list->generate_code();}
 	if(stat_list != NULL){stat_list->generate_code();}
 	//resize all vectors everytime we exit a scope so that past variables in deepr scopes aren't kept
@@ -835,6 +1206,7 @@ void CompStat::generate_code()
 	{
 		it->second.resize(global_scope); 
 	}
+	
 	global_scope--;
 }
 void CompStat::get_max_arguments(int& _offset)
@@ -918,7 +1290,7 @@ void Stat::generate_code()
 }
 */
 
-JumpStat::JumpStat(Expr* _expr, std::string _type) : expr(_expr), type(_type) {} 
+JumpStat::JumpStat(Expr* _expr, std::string _type, std::string _id) : expr(_expr), type(_type), id(_id) {} 
 void JumpStat::generate_code()
 {
 	if(type == "return")
@@ -933,9 +1305,21 @@ void JumpStat::generate_code()
 		}
 		else
 		{
-			os << "$0" << std::endl; 
+			os << "\tmove\t$2," << "$0" << std::endl; 
 		}
 		
+	}
+
+	if(type == "break")
+	{
+		os << "\tj\t" << "break_" << Breaks.back() << std::endl;  
+		os << "\tnop" << std::endl; 
+	}
+
+	if(type == "goto")
+	{
+		os << "\tj\t" << "tag_" << id << std::endl; 
+		os << "\tnop" << std::endl;
 	}
 }
 void JumpStat::get_max_arguments(int& _offset) 
@@ -1032,25 +1416,97 @@ void Expression::generate_code()
 	
 	if(op == "+")
 	{
-		if(lhs != NULL) lhs->get_tag(tag_lhs);
-		if(rhs != NULL) rhs->get_tag(tag_rhs);
-
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string lhs_type = "";
+		std::string rhs_type = ""; 
+		if(lhs != NULL) 
+		{
+			lhs->get_tag(tag_lhs);
+			lhs->get_type(lhs_type);
+		}
+		if(rhs != NULL) 
+		{
+			rhs->get_tag(tag_rhs);
+			rhs->get_type(rhs_type); 
+		}
+		if(rhs_type == "pointer" && lhs_type == "pointer")
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
+			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsra" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		else if(lhs_type == "pointer")
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
+			os << "\tsll" << "\t$" << TMP2 << ",$" << TMP2 << ",2" << std::endl; 
+			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		else if(rhs_type == "pointer")
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
+			os << "\tsll" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
+			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		if(rhs_type != "pointer" && lhs_type != "pointer")
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 		
 	}
 
 	if(op == "-")
 	{
-		if(lhs != NULL)	lhs->get_tag(tag_lhs);
-		if(rhs != NULL)	rhs->get_tag(tag_rhs);
-
-		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-		os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		std::string lhs_type = "";
+		std::string rhs_type = ""; 
+		if(lhs != NULL) 
+		{
+			lhs->get_tag(tag_lhs);
+			lhs->get_type(lhs_type);
+		}
+		if(rhs != NULL) 
+		{
+			rhs->get_tag(tag_rhs);
+			rhs->get_type(rhs_type); 
+		}
+		if(rhs_type == "pointer" && lhs_type == "pointer")
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
+			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsra" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		else if(lhs_type == "pointer")
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
+			os << "\tsll" << "\t$" << TMP2 << ",$" << TMP2 << ",2" << std::endl; 
+			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		else if(rhs_type == "pointer")
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
+			os << "\tsll" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
+			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		if(rhs_type != "pointer" && lhs_type != "pointer")
+		{
+			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+		}
 	}
 
 	if(op == "*")
@@ -1244,12 +1700,65 @@ void Expression::generate_code()
 }
 void Expression::get_max_arguments(int& _offset)
 {
-	if(lhs != NULL){lhs->get_max_arguments(_offset);}
-	if(rhs != NULL){rhs->get_max_arguments(_offset);}
-	if(unary_expr != NULL) {unary_expr->get_max_arguments(_offset);}
+	int l=0, r=0, ue=0; 
+	std::vector<int> tmp; 
+	if(lhs != NULL)
+	{
+		lhs->get_max_arguments(l);
+		tmp.push_back(l); 
+	}
+	if(rhs != NULL)
+	{
+		rhs->get_max_arguments(r);
+		tmp.push_back(r); 
+	}
+	if(unary_expr != NULL) 
+	{
+		unary_expr->get_max_arguments(ue);
+		tmp.push_back(ue); 
+	}
+	
+	if(!tmp.empty())
+	{
+		std::vector<int>::iterator i1; 
+		i1 = std::max_element(tmp.begin(), tmp.end());
+		std::cerr << "MAX2: " << *i1 << std::endl; 
+		_offset = *i1;
+		/*
+		int max = tmp[0]; 
+		for(int i=0; i<tmp.size(); i++)
+		{
+			std::cerr << tmp[i] << std::endl; 
+			if(tmp[i] > max) 
+			{
+				max = tmp[i]; 
+			}
+		}
+		std::cerr << "MAX2: " << max << std::endl; 
+		_offset = max;
+		*/
+	}
+}
+void Expression::get_value(int& _value)
+{
+	if(lhs != NULL) {lhs->get_value(_value);}
+	if(rhs != NULL) {rhs->get_value(_value);}
+	if(unary_expr != NULL) {unary_expr->get_value(_value);}
+}
+void Expression::get_type(std::string& _type)
+{
+	if(lhs != NULL) {lhs->get_type(_type);}
+	if(rhs != NULL) {rhs->get_type(_type);}
+	if(unary_expr != NULL) {unary_expr->get_type(_type);}
+}
+void Expression::set_modify(bool status)
+{
+	if(lhs != NULL) {lhs->set_modify(status);}
+	if(rhs != NULL) {rhs->set_modify(status);}
+	if(unary_expr != NULL) {unary_expr->set_modify(status);}
 }
 
-UnaryExpr::UnaryExpr(PostFixExpr* _post_fix_expr, UnaryExpr* _unary_expr, std::string _unary_op) : post_fix_expr(_post_fix_expr), unary_expr(_unary_expr), unary_op(_unary_op) {}
+UnaryExpr::UnaryExpr(PostFixExpr* _post_fix_expr, UnaryExpr* _unary_expr, std::string _unary_op) : post_fix_expr(_post_fix_expr), unary_expr(_unary_expr), unary_op(_unary_op), modify(false) {}
 void UnaryExpr::print()
 {
 	if(post_fix_expr != NULL)
@@ -1271,6 +1780,18 @@ void UnaryExpr::generate_code()
 {
 	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
 	
+	if(unary_expr != NULL && (unary_op == "++" || unary_op == "--")) 
+	{
+		std::string type = "";
+		unary_expr->get_type(type);
+		//os << type << std::endl; 
+		if(type == "array") 
+		{
+			unary_expr->set_modify(true);
+			//post_fix_expr->generate_code();
+		}
+	}
+	
 	if(unary_expr != NULL)
 	{
 		tag = set_offset(); 
@@ -1281,22 +1802,81 @@ void UnaryExpr::generate_code()
 
 		if(unary_op == "++")
 		{
-			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			unary_expr->set_inc_dec(true);
+			std::string rhs_tag;
+			if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
+
+			if(IsPointer[rhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",4" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			}
+			else if(!IsArray[rhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			}
+			else
+			{
+				unary_expr->set_inc_dec(false);
+				std::string rhs_tag; 
+				if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
+
+				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",1" << std::endl; 
+				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  
+				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+			}
 		}
+
 		if(unary_op == "--")
 		{
-			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			unary_expr->set_inc_dec(true);
+			std::string rhs_tag;
+			if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
+		
+			if(IsPointer[rhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-4" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+			}
+			else if(!IsArray[rhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+			}
+			else
+			{
+				unary_expr->set_inc_dec(false);
+				std::string rhs_tag; 
+				if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
+
+				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",-1" << std::endl; 
+				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  
+				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+			}
+
 		}
 		if(unary_op == "-")
 		{
 			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
 			os << "\tneg\t$" << TMP1 << ",$" << TMP1 << std::endl;
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		if(unary_op == "+")
+		{
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
 			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
 		if(unary_op == "~")
@@ -1313,6 +1893,26 @@ void UnaryExpr::generate_code()
 			os << "\tmovz\t$" << TMP3 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
 			os << "\tsw\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
+
+		if(unary_op == "*")
+		{
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
+			if(modify)
+			{
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 	
+			}
+			else
+			{
+				os << "\tlw\t$" << TMP1 << "," << "0($" << TMP1 << ")" << std::endl;
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+			}
+		}
+
+		if(unary_op == "&")
+		{
+			os << "\tla\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
 	}
 }
 void UnaryExpr::get_tag(std::string& _tag)
@@ -1326,11 +1926,34 @@ void UnaryExpr::get_tag(std::string& _tag)
 }
 void UnaryExpr::get_max_arguments(int& _offset)
 {
-	if(post_fix_expr != NULL) {post_fix_expr->get_max_arguments(_offset);}
-	if(unary_expr != NULL) {unary_expr->get_max_arguments(_offset);}
+	int pe=0, ue=0;
+	if(post_fix_expr != NULL) {post_fix_expr->get_max_arguments(pe);}
+	if(unary_expr != NULL) {unary_expr->get_max_arguments(ue);}
+
+	if(pe > ue) {_offset = pe;}
+	else {_offset = ue;}
+}
+void UnaryExpr::get_type(std::string& _type)
+{
+	if(unary_op == "*") {_type = "pointer";}
+	if(post_fix_expr != NULL) {post_fix_expr->get_type(_type);}
+}
+void UnaryExpr::set_modify(bool status)
+{
+	if(unary_op == "*") {modify = status;}
+	if(post_fix_expr != NULL) {post_fix_expr->set_modify(status);}
+}
+void UnaryExpr::get_value(int& _value)
+{
+	if(post_fix_expr != NULL) {post_fix_expr->get_value(_value);}
+	if(unary_expr != NULL) {unary_expr->get_value(_value);}
+}
+void UnaryExpr::set_inc_dec(bool status)
+{
+	if(post_fix_expr != NULL) {post_fix_expr->set_inc_dec(status);}
 }
 
-PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list) {}
+PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list, Expr* _expr, bool _is_array) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list), expr(_expr), modify(false), is_array(_is_array), parent_inc_dec(false) {}
 void PostFixExpr::print()
 {
 	if(prim_expr != NULL)
@@ -1349,6 +1972,19 @@ void PostFixExpr::print()
 void PostFixExpr::generate_code()
 {
 	if(prim_expr != NULL){prim_expr->generate_code();}
+	
+	if(post_fix_expr != NULL && op != "") 
+	{
+		std::string type = "";
+		post_fix_expr->get_type(type);
+		//os << type << std::endl; 
+		if(type == "array") 
+		{
+			post_fix_expr->set_modify(true);
+			//post_fix_expr->generate_code();
+		}
+	}
+
 	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
 	if(arg_list != NULL) 
 	{
@@ -1379,28 +2015,112 @@ void PostFixExpr::generate_code()
 		std::cerr << "OP: " << op << std::endl; 
 		std::cerr << "LHS: " << lhs_tag << std::endl;
 		std::cerr << std::endl;
+	
 
 		if(op == "++")
 		{
-			os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
+			post_fix_expr->set_inc_dec(true);
+			std::string lhs_tag;
+			if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+			
+			if(IsPointer[lhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",4" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			}
+			else if(!IsArray[lhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			}
+			else
+			{
+				post_fix_expr->set_inc_dec(false);
+				std::string lhs_tag; 
+				if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+
+				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",1" << std::endl; 
+				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  	
+			}
 		}
 		if(op == "--")
 		{
-			os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;  
+			post_fix_expr->set_inc_dec(true);
+			std::string lhs_tag;
+			if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+			
+			if(IsPointer[lhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-4" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			}
+			else if(!IsArray[lhs_tag])
+			{
+				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
+				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
+				os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
+			}
+			else
+			{
+				post_fix_expr->set_inc_dec(false);
+				std::string lhs_tag; 
+				if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
+				
+				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl;
+				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
+				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
+				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",-1" << std::endl; 
+				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  
+			}
+		}
+	}
+	if(/*expr != NULL*/is_array)
+	{
+		tag = set_offset();
+
+		expr->generate_code(); 
+		std::string e_tag; 
+		expr->get_tag(e_tag);
+		os << "\tlw\t$" << TMP1 << "," << OffsetMap[e_tag] << "($fp)" << std::endl; 
+
+		std::string pe_tag; 
+		post_fix_expr->get_tag(pe_tag);
+		//os << "\tla\t$" << ARR_REG << ",arr_" << OffsetMap[pe_tag] << std::endl;
+		os << "\tlw\t$" << ARR_REG << "," << OffsetMap[pe_tag] << "($fp)" << std::endl; 
+		os << "\tsll\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
+		os << "\tadd\t$" << ARR_REG << ",$" << ARR_REG << ",$" << TMP1 << std::endl;
+		if(modify)
+		{
+			os << "\tsw\t$" << ARR_REG << "," << OffsetMap[tag] << "($fp)" << std::endl; 
+		}
+		else
+		{
+			os << "\tlw\t$" << TMP1 << ",0($" << ARR_REG << ")" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
 	}
 }
 void PostFixExpr::get_tag(std::string& _tag)
 {
 	if(op != "") {_tag = tag;}
-	if(prim_expr != NULL) {prim_expr->get_tag(_tag);}
 	if(arg_list != NULL) {_tag = tag;}
+	if(is_array && parent_inc_dec) {post_fix_expr->get_tag(_tag);}
+	if(is_array && !parent_inc_dec)
+	{
+		_tag = tag;
+		//parent_inc_dec = 0; 
+	}
+	if(prim_expr != NULL) {prim_expr->get_tag(_tag);}
 }
 void PostFixExpr::get_max_arguments(int& _offset)
 {
@@ -1410,6 +2130,25 @@ std::string PostFixExpr::get_id()
 {
 	if(post_fix_expr != NULL) {return post_fix_expr->get_id();}
 	if(prim_expr != NULL) {return prim_expr->get_id();}
+}
+void PostFixExpr::get_type(std::string& _type)
+{
+	//if(op != "") {post_fix_expr->get_type(_type);}
+	if(is_array) {_type = "array";}
+}
+void PostFixExpr::set_modify(bool status)
+{
+	//if(op != "") {post_fix_expr->set_modify(status);}
+	/*else {*/modify = status;//} 
+}
+void PostFixExpr::get_value(int& _value)
+{
+	if(prim_expr != NULL) {prim_expr->get_value(_value);}
+	if(post_fix_expr != NULL) {post_fix_expr->get_value(_value);}
+}
+void PostFixExpr::set_inc_dec(bool status)
+{
+	parent_inc_dec = status;
 }
 
 ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), arg_list(_arg_list)
@@ -1431,21 +2170,24 @@ ArgList::ArgList(AssExpr* _ass_expr, ArgList* _arg_list) : ass_expr(_ass_expr), 
 }
 void ArgList::generate_code()
 {
-	if(arg_list != NULL){arg_list->generate_code();}
 	if(ass_expr != NULL) 
 	{
 		ass_expr->generate_code(); 
 		std::string ass_tag = ""; 
 		ass_expr->get_tag(ass_tag);
-		os << "\tlw\t$" << TMP1 << "," << OffsetMap[ass_tag] << "($fp)" << std::endl;
+		
+		/*if(IsArray[ass_tag]) {os << "\tla\t$" << TMP1 << "," << "arr_" << OffsetMap[ass_tag] << std::endl;}*/
+		/*else{*/os << "\tlw\t$" << TMP1 << "," << OffsetMap[ass_tag] << "($fp)" << std::endl;//}
+	
 		if(num_arguments < 4)
 		{
 			os << "\tmove\t$a" << num_arguments << ",$" << TMP1 << std::endl; 
 		}
 		os << "\tsw\t$" << TMP1 << "," << num_arguments*4 << "($fp)" << std::endl;
+		
 		num_arguments++; 
 	}
-	
+	if(arg_list != NULL){arg_list->generate_code();}
 }
 void ArgList::get_max_arguments(int& _offset)
 {
@@ -1478,8 +2220,12 @@ void Expr::get_tag(std::string& _tag)
 }
 void Expr::get_max_arguments(int& _offset)
 {
-	if(ass_expr != NULL) {ass_expr->get_max_arguments(_offset);}
-	if(expr != NULL) {expr->get_max_arguments(_offset);}
+	int ae=0, e=0; 
+	if(ass_expr != NULL) {ass_expr->get_max_arguments(ae);}
+	if(expr != NULL) {expr->get_max_arguments(e);}
+
+	if(ae > e) {_offset = ae;}
+	else {_offset = e;}
 }
 
 LoopStat::LoopStat(ExprStat* _es1, ExprStat* _es2, Expr* _e, Stat* _s, DoStat* _ds) : expr_stat_1(_es1), expr_stat_2(_es2), expr(_e), stat(_s), do_stat(_ds) {}
@@ -1509,6 +2255,7 @@ void LoopStat::print()
 }
 void LoopStat::generate_code()
 {
+	Breaks.push_back(++break_num);
 	//increment loop number count
 	int loop_num = glbl_loop_num; 
 	//while loop
@@ -1557,9 +2304,49 @@ void LoopStat::generate_code()
 		glbl_loop_num++;
 		do_stat->generate_code();
 	}
+	
 	loop_num--;
+	os << "break_" << Breaks.back() << ":" << std::endl;
+	Breaks.pop_back();
 }
-void LoopStat::get_max_arguments(int& _offset) {}
+void LoopStat::get_max_arguments(int& _offset) 
+{
+	int es1=0, es2=0, e=0, s=0, ds=0; 
+	std::vector<int> tmp; 
+	if(expr_stat_1 != NULL)
+	{
+		expr_stat_1->get_max_arguments(es1);
+		tmp.push_back(es1);
+	}
+	if(expr_stat_2 != NULL)
+	{
+		expr_stat_2->get_max_arguments(es2);
+		tmp.push_back(es2);
+	}
+	if(expr != NULL)
+	{
+		expr->get_max_arguments(e);
+		tmp.push_back(e);
+	}
+	if(stat != NULL)
+	{
+		stat->get_max_arguments(s);
+		tmp.push_back(s);
+	}
+	if(do_stat != NULL)
+	{
+		do_stat->get_max_arguments(ds);
+		tmp.push_back(ds); 
+	}
+
+	if(!tmp.empty())
+	{
+		std::vector<int>::iterator i1; 
+		i1 = std::max_element(tmp.begin(), tmp.end());
+		std::cerr << "MAX3: " << *i1 << std::endl; 
+		_offset = *i1;
+	}
+}
 
 DoStat::DoStat(Stat* _stat, Expr* _expr) : stat(_stat), expr(_expr) {}
 void DoStat::print() 
@@ -1590,8 +2377,17 @@ void DoStat::generate_code()
 		//os << "end_loop_" << glbl_loop_num << ":" << std::endl; 
 	}
 }
+void DoStat::get_max_arguments(int& _offset)
+{
+	int s=0, e=0;
+	if(stat != NULL){stat->get_max_arguments(s);}
+	if(expr != NULL){expr->get_max_arguments(e);}
+	
+	if(s > e){_offset = s;}
+	else {_offset = e;}
+}
 
-SelecStat::SelecStat(Expr* _e, Stat* _si, Stat* _se) : expr(_e), stat_if(_si), stat_else(_se) {}
+SelecStat::SelecStat(Expr* _e, Stat* _si, Stat* _se, Stat* _s) : expr(_e), stat_if(_si), stat_else(_se), stat(_s) {}
 void SelecStat::print() 
 {
 	if(expr != NULL)
@@ -1634,10 +2430,130 @@ void SelecStat::generate_code()
 		//glbl_selec_num++;
 		stat_else->generate_code();
 	}
-	os << "if_out_" << selec_num << ":" << std::endl; 
-	selec_num--;
+	if(stat == NULL)
+	{
+		os << "if_out_" << selec_num << ":" << std::endl; 
+		selec_num--;
+	}
+	else if(stat != NULL)
+	{
+		Breaks.push_back(++break_num);
+		if(expr != NULL) 
+		{
+			expr->generate_code();
+		}
+		std::string e_tag; 
+		expr->get_tag(e_tag);
+		os << "\tlw\t$" << CASE_REG << "," << OffsetMap[e_tag] << "($fp)" << std::endl; 
+
+		cases = true; 
+		int curr_case_num = case_num; 
+		stat->generate_code();
+		
+		cases = false;
+		case_num = curr_case_num; 
+		stat->generate_code();
+
+		os << "break_" << Breaks.back() << ":" << std::endl;
+		Breaks.pop_back();
+	}
 }
-void SelecStat::get_max_arguments(int& _offset) {}
+void SelecStat::get_max_arguments(int& _offset) 
+{
+	int e=0, si=0, se=0; 
+	std::vector<int> tmp; 
+	if(expr != NULL)
+	{
+		expr->get_max_arguments(e);
+		tmp.push_back(e); 
+	}
+	if(stat_if != NULL)
+	{
+		stat_if->get_max_arguments(si);
+		tmp.push_back(si);
+	}
+	if(stat_else != NULL)
+	{
+		stat_else->get_max_arguments(se);
+		tmp.push_back(se); 
+	}
+	
+	if(!tmp.empty())
+	{
+		std::vector<int>::iterator i1; 
+		i1 = std::max_element(tmp.begin(), tmp.end());
+		std::cerr << "MAX4: " << *i1 << std::endl; 
+		_offset = *i1;
+		/*
+		int max = tmp[0]; 
+		for(int i=0; i<tmp.size(); i++)
+		{
+			std::cerr << tmp[i] << std::endl; 
+			if(tmp[i] > max) 
+			{
+				max = tmp[i]; 
+			}
+		}
+		std::cerr << "MAX4: " << max << std::endl; 
+		_offset = max;
+		*/
+	}
+}
+
+TagStat::TagStat(Stat* _stat, CondExpr* _cond_expr, std::string _id) : stat(_stat), cond_expr(_cond_expr), id(_id) {}
+void TagStat::generate_code()	
+{
+	if(id != "")
+	{
+		os << "tag_" << id << ":" << std::endl; 
+		if(stat != NULL)
+		{
+			stat->generate_code(); 
+		}
+	}
+	//case statement
+	if(cond_expr != NULL)
+	{
+		if(cases)
+		{
+			//os << "case_" << case_num << ":" << std::endl; 
+			cond_expr->generate_code(); 
+			std::string c_tag=""; 
+			cond_expr->get_tag(c_tag);
+
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[c_tag] << "($fp)" << std::endl; 
+			//os << "\tli\t$" << TMP2 << "," << case_num << std::endl; 
+			os << "\tbne\t$" << TMP1 << ",$" << CASE_REG << "," << "case_" << case_num+1 << std::endl;
+			os << "\tnop" << std::endl;
+			os << "\tj\t" << "body_" << case_num << std::endl;
+			os << "\tnop" << std::endl;
+			
+			case_num++;
+			os << "case_" << case_num << ":" << std::endl; 
+		}
+		else
+		{
+			os << "body_" << case_num << ":" << std::endl; 
+			if(stat != NULL) 
+			{
+				stat->generate_code();
+			}
+
+			case_num++;
+		}
+		
+		//os <<"case_" << case_num << ":" << std::endl;
+		//os << "body_" << case_num << ":" << std::endl;
+	}
+	//default
+	if(stat != NULL && cond_expr == NULL && id == "" && !cases)
+	{
+		//os <<"case_" << case_num << ":" << std::endl;
+		//os << "body_" << case_num << ":" << std::endl;
+		stat->generate_code();
+	}
+	
+}
 
 IfElseExpr::IfElseExpr(Expression* _ic, Expr* _ie, CondExpr* _ee) : if_cond(_ic), if_expr(_ie), else_expr(_ee) {}
 void IfElseExpr::print()
@@ -1666,11 +2582,6 @@ void IfElseExpr::generate_code()
 	std::string true_tag = ""; 
 	std::string false_tag = ""; 
 	
-	if(if_cond != NULL)
-	{
-		if_cond->generate_code();
-		if_cond->get_tag(condition_tag);
-	}
 	if(if_expr != NULL)
 	{
 		if_expr->generate_code();
@@ -1680,6 +2591,11 @@ void IfElseExpr::generate_code()
 	{
 		else_expr->generate_code();
 		else_expr->get_tag(false_tag);
+	}
+	if(if_cond != NULL)
+	{
+		if_cond->generate_code();
+		if_cond->get_tag(condition_tag);
 	}
 
 	os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[condition_tag] << "($fp)" << std::endl; 
@@ -1695,7 +2611,7 @@ void IfElseExpr::get_tag(std::string& _tag)
 }
 
 
-#line 1699 "c_parser.tab.c" /* yacc.c:339  */
+#line 2615 "c_parser.tab.c" /* yacc.c:339  */
 
 # ifndef YY_NULLPTR
 #  if defined __cplusplus && 201103L <= __cplusplus
@@ -1736,85 +2652,87 @@ extern int yydebug;
     RCURLY = 261,
     LBRAC = 262,
     RBRAC = 263,
-    INT = 264,
-    FLOAT = 265,
-    DOUBLE = 266,
-    BOOL = 267,
-    LONG = 268,
-    UNSIGNED = 269,
-    SIGNED = 270,
-    CONST = 271,
-    SHORT = 272,
-    VOID = 273,
-    STRUCT = 274,
-    UNION = 275,
-    CHAR = 276,
-    TYPEDEF = 277,
-    VOLATILE = 278,
-    STRING = 279,
-    IDENTIFIER = 280,
-    INT_VAL = 281,
-    FLOAT_VAL = 282,
-    STRING_LIT = 283,
-    OCT_VAL = 284,
-    HEX_VAL = 285,
-    IF = 286,
-    ELSE = 287,
-    FOR = 288,
-    WHILE = 289,
-    GOTO_KWD = 290,
-    CONTINUE_KWD = 291,
-    BREAK = 292,
-    RETURN = 293,
-    EQUALS = 294,
-    MUL_EQUALS = 295,
-    DIV_EQUALS = 296,
-    MOD_EQUALS = 297,
-    ADD_EQUALS = 298,
-    SUB_EQUALS = 299,
-    LEFT_EQUALS = 300,
-    RIGHT_EQUALS = 301,
-    AND_EQUALS = 302,
-    OR_EQUALS = 303,
-    XOR_EQUALS = 304,
-    ADD = 305,
-    SUB = 306,
-    MULT = 307,
-    DIV = 308,
-    MOD = 309,
-    QUESTION_MARK = 310,
-    COLON = 311,
-    OR = 312,
-    AND = 313,
-    BW_OR = 314,
-    BW_XOR = 315,
-    BW_AND = 316,
-    EQUAL_EQUAL = 317,
-    NOT_EQUAL = 318,
-    LT = 319,
-    GT = 320,
-    LE = 321,
-    GE = 322,
-    LEFT_SHIFT = 323,
-    RIGHT_SHIFT = 324,
-    INC = 325,
-    DEC = 326,
-    BW_NOT = 327,
-    NOT = 328,
-    ENUM = 329,
-    CHAR_KWD = 330,
-    FLOAT_KWD = 331,
-    DOUBLE_KWD = 332,
-    AUTO = 333,
-    EXTERN = 334,
-    REGISTER = 335,
-    STATIC = 336,
-    DO = 337,
-    SWITCH = 338,
-    CASE = 339,
-    SIZEOF = 340,
-    DEFAULT = 341,
-    TYPE = 342
+    LSQBRAC = 264,
+    RSQBRAC = 265,
+    INT = 266,
+    FLOAT = 267,
+    DOUBLE = 268,
+    BOOL = 269,
+    LONG = 270,
+    UNSIGNED = 271,
+    SIGNED = 272,
+    CONST = 273,
+    SHORT = 274,
+    VOID = 275,
+    STRUCT = 276,
+    UNION = 277,
+    CHAR = 278,
+    TYPEDEF = 279,
+    VOLATILE = 280,
+    STRING = 281,
+    IDENTIFIER = 282,
+    INT_VAL = 283,
+    FLOAT_VAL = 284,
+    STRING_LIT = 285,
+    OCT_VAL = 286,
+    HEX_VAL = 287,
+    IF = 288,
+    ELSE = 289,
+    FOR = 290,
+    WHILE = 291,
+    GOTO_KWD = 292,
+    CONTINUE_KWD = 293,
+    BREAK = 294,
+    RETURN = 295,
+    EQUALS = 296,
+    MUL_EQUALS = 297,
+    DIV_EQUALS = 298,
+    MOD_EQUALS = 299,
+    ADD_EQUALS = 300,
+    SUB_EQUALS = 301,
+    LEFT_EQUALS = 302,
+    RIGHT_EQUALS = 303,
+    AND_EQUALS = 304,
+    OR_EQUALS = 305,
+    XOR_EQUALS = 306,
+    ADD = 307,
+    SUB = 308,
+    MULT = 309,
+    DIV = 310,
+    MOD = 311,
+    QUESTION_MARK = 312,
+    COLON = 313,
+    OR = 314,
+    AND = 315,
+    BW_OR = 316,
+    BW_XOR = 317,
+    BW_AND = 318,
+    EQUAL_EQUAL = 319,
+    NOT_EQUAL = 320,
+    LT = 321,
+    GT = 322,
+    LE = 323,
+    GE = 324,
+    LEFT_SHIFT = 325,
+    RIGHT_SHIFT = 326,
+    INC = 327,
+    DEC = 328,
+    BW_NOT = 329,
+    NOT = 330,
+    ENUM = 331,
+    CHAR_KWD = 332,
+    FLOAT_KWD = 333,
+    DOUBLE_KWD = 334,
+    AUTO = 335,
+    EXTERN = 336,
+    REGISTER = 337,
+    STATIC = 338,
+    DO = 339,
+    SWITCH = 340,
+    CASE = 341,
+    SIZEOF = 342,
+    DEFAULT = 343,
+    TYPE = 344
   };
 #endif
 
@@ -1823,7 +2741,7 @@ extern int yydebug;
 
 union YYSTYPE
 {
-#line 1636 "src/c_parser.y" /* yacc.c:355  */
+#line 2552 "src/c_parser.y" /* yacc.c:355  */
 
 	char* string;
 	int i_num; 
@@ -1859,8 +2777,11 @@ union YYSTYPE
 	class DoStat* Do_Stat;
 	class SelecStat* Selec_Stat;
 	class IfElseExpr* IE_Expr;
+	class InitValList* Init_Val_List;
+	class TagStat* Tag_Stat;
+	class Pointer* Pntr;
 
-#line 1864 "c_parser.tab.c" /* yacc.c:355  */
+#line 2785 "c_parser.tab.c" /* yacc.c:355  */
 };
 
 typedef union YYSTYPE YYSTYPE;
@@ -1877,7 +2798,7 @@ int yyparse (void);
 
 /* Copy the second part of user declarations.  */
 
-#line 1881 "c_parser.tab.c" /* yacc.c:358  */
+#line 2802 "c_parser.tab.c" /* yacc.c:358  */
 
 #ifdef short
 # undef short
@@ -2119,21 +3040,21 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  8
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   478
+#define YYLAST   583
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  88
+#define YYNTOKENS  90
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  42
+#define YYNNTS  45
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  118
+#define YYNRULES  133
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  193
+#define YYNSTATES  228
 
 /* YYTRANSLATE[YYX] -- Symbol number corresponding to YYX as returned
    by yylex, with out-of-bounds checking.  */
 #define YYUNDEFTOK  2
-#define YYMAXUTOK   342
+#define YYMAXUTOK   344
 
 #define YYTRANSLATE(YYX)                                                \
   ((unsigned int) (YYX) <= YYMAXUTOK ? yytranslate[YYX] : YYUNDEFTOK)
@@ -2176,25 +3097,27 @@ static const yytype_uint8 yytranslate[] =
       55,    56,    57,    58,    59,    60,    61,    62,    63,    64,
       65,    66,    67,    68,    69,    70,    71,    72,    73,    74,
       75,    76,    77,    78,    79,    80,    81,    82,    83,    84,
-      85,    86,    87
+      85,    86,    87,    88,    89
 };
 
 #if YYDEBUG
   /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,  1718,  1718,  1719,  1722,  1723,  1726,  1729,  1730,  1733,
-    1734,  1737,  1738,  1741,  1744,  1745,  1748,  1749,  1752,  1753,
-    1756,  1757,  1758,  1759,  1760,  1763,  1764,  1765,  1768,  1769,
-    1772,  1775,  1776,  1777,  1778,  1781,  1784,  1785,  1788,  1789,
-    1790,  1791,  1794,  1797,  1798,  1801,  1802,  1803,  1806,  1807,
-    1810,  1811,  1814,  1815,  1816,  1817,  1818,  1819,  1820,  1821,
-    1822,  1823,  1824,  1827,  1828,  1831,  1834,  1835,  1838,  1839,
-    1842,  1843,  1846,  1847,  1850,  1851,  1854,  1855,  1856,  1859,
-    1860,  1861,  1862,  1863,  1866,  1867,  1868,  1871,  1872,  1873,
-    1876,  1877,  1878,  1879,  1882,  1883,  1884,  1885,  1888,  1889,
-    1890,  1891,  1892,  1893,  1896,  1897,  1898,  1899,  1900,  1903,
-    1904,  1907,  1908,  1909,  1910,  1911,  1912,  1913,  1914
+       0,  2640,  2640,  2641,  2644,  2645,  2648,  2651,  2652,  2655,
+    2656,  2659,  2660,  2663,  2666,  2667,  2670,  2671,  2674,  2675,
+    2678,  2679,  2680,  2681,  2682,  2683,  2686,  2687,  2688,  2689,
+    2690,  2691,  2694,  2695,  2698,  2699,  2702,  2705,  2706,  2707,
+    2708,  2711,  2712,  2715,  2716,  2719,  2720,  2721,  2724,  2725,
+    2726,  2727,  2730,  2733,  2734,  2737,  2738,  2739,  2740,  2743,
+    2744,  2745,  2748,  2749,  2752,  2753,  2756,  2757,  2758,  2759,
+    2760,  2761,  2762,  2763,  2764,  2765,  2766,  2769,  2770,  2773,
+    2776,  2777,  2780,  2781,  2784,  2785,  2788,  2789,  2792,  2793,
+    2796,  2797,  2798,  2801,  2802,  2803,  2804,  2805,  2808,  2809,
+    2810,  2813,  2814,  2815,  2818,  2819,  2820,  2821,  2824,  2825,
+    2826,  2827,  2830,  2831,  2832,  2833,  2834,  2835,  2838,  2839,
+    2840,  2841,  2842,  2843,  2846,  2847,  2850,  2851,  2852,  2853,
+    2854,  2855,  2856,  2857
 };
 #endif
 
@@ -2204,23 +3127,24 @@ static const yytype_uint16 yyrline[] =
 static const char *const yytname[] =
 {
   "$end", "error", "$undefined", "SEMICOLON", "COMMA", "LCURLY", "RCURLY",
-  "LBRAC", "RBRAC", "INT", "FLOAT", "DOUBLE", "BOOL", "LONG", "UNSIGNED",
-  "SIGNED", "CONST", "SHORT", "VOID", "STRUCT", "UNION", "CHAR", "TYPEDEF",
-  "VOLATILE", "STRING", "IDENTIFIER", "INT_VAL", "FLOAT_VAL", "STRING_LIT",
-  "OCT_VAL", "HEX_VAL", "IF", "ELSE", "FOR", "WHILE", "GOTO_KWD",
-  "CONTINUE_KWD", "BREAK", "RETURN", "EQUALS", "MUL_EQUALS", "DIV_EQUALS",
-  "MOD_EQUALS", "ADD_EQUALS", "SUB_EQUALS", "LEFT_EQUALS", "RIGHT_EQUALS",
-  "AND_EQUALS", "OR_EQUALS", "XOR_EQUALS", "ADD", "SUB", "MULT", "DIV",
-  "MOD", "QUESTION_MARK", "COLON", "OR", "AND", "BW_OR", "BW_XOR",
-  "BW_AND", "EQUAL_EQUAL", "NOT_EQUAL", "LT", "GT", "LE", "GE",
-  "LEFT_SHIFT", "RIGHT_SHIFT", "INC", "DEC", "BW_NOT", "NOT", "ENUM",
-  "CHAR_KWD", "FLOAT_KWD", "DOUBLE_KWD", "AUTO", "EXTERN", "REGISTER",
-  "STATIC", "DO", "SWITCH", "CASE", "SIZEOF", "DEFAULT", "TYPE", "$accept",
-  "file", "external_decl", "function_def", "decl", "decl_specifiers",
-  "decl_list", "type_specifier", "init_list", "init_declarator",
-  "statement_list", "statement", "declarator", "param_list", "param_decl",
-  "compound_statement", "initial_val", "selection_statement",
-  "loop_statement", "do_statement", "expr_statement", "jump_statement",
+  "LBRAC", "RBRAC", "LSQBRAC", "RSQBRAC", "INT", "FLOAT", "DOUBLE", "BOOL",
+  "LONG", "UNSIGNED", "SIGNED", "CONST", "SHORT", "VOID", "STRUCT",
+  "UNION", "CHAR", "TYPEDEF", "VOLATILE", "STRING", "IDENTIFIER",
+  "INT_VAL", "FLOAT_VAL", "STRING_LIT", "OCT_VAL", "HEX_VAL", "IF", "ELSE",
+  "FOR", "WHILE", "GOTO_KWD", "CONTINUE_KWD", "BREAK", "RETURN", "EQUALS",
+  "MUL_EQUALS", "DIV_EQUALS", "MOD_EQUALS", "ADD_EQUALS", "SUB_EQUALS",
+  "LEFT_EQUALS", "RIGHT_EQUALS", "AND_EQUALS", "OR_EQUALS", "XOR_EQUALS",
+  "ADD", "SUB", "MULT", "DIV", "MOD", "QUESTION_MARK", "COLON", "OR",
+  "AND", "BW_OR", "BW_XOR", "BW_AND", "EQUAL_EQUAL", "NOT_EQUAL", "LT",
+  "GT", "LE", "GE", "LEFT_SHIFT", "RIGHT_SHIFT", "INC", "DEC", "BW_NOT",
+  "NOT", "ENUM", "CHAR_KWD", "FLOAT_KWD", "DOUBLE_KWD", "AUTO", "EXTERN",
+  "REGISTER", "STATIC", "DO", "SWITCH", "CASE", "SIZEOF", "DEFAULT",
+  "TYPE", "$accept", "file", "external_decl", "function_def", "decl",
+  "decl_specifiers", "decl_list", "type_specifier", "init_list",
+  "init_declarator", "statement_list", "statement", "declarator",
+  "pointer", "param_list", "param_decl", "compound_statement",
+  "initial_val", "init_val_list", "selection_statement", "loop_statement",
+  "do_statement", "expr_statement", "jump_statement", "tag_statement",
   "expr", "assign_expr", "assign_oper", "conditional_expr", "ie_expr",
   "logical_or_expr", "logical_and_expr", "incl_or_expr", "excl_or_expr",
   "and_expr", "bool_equal_expr", "comparison_expr", "shift_expr",
@@ -2242,14 +3166,14 @@ static const yytype_uint16 yytoknum[] =
      305,   306,   307,   308,   309,   310,   311,   312,   313,   314,
      315,   316,   317,   318,   319,   320,   321,   322,   323,   324,
      325,   326,   327,   328,   329,   330,   331,   332,   333,   334,
-     335,   336,   337,   338,   339,   340,   341,   342
+     335,   336,   337,   338,   339,   340,   341,   342,   343,   344
 };
 # endif
 
-#define YYPACT_NINF -81
+#define YYPACT_NINF -95
 
 #define yypact_value_is_default(Yystate) \
-  (!!((Yystate) == (-81)))
+  (!!((Yystate) == (-95)))
 
 #define YYTABLE_NINF -1
 
@@ -2260,26 +3184,29 @@ static const yytype_uint16 yytoknum[] =
      STATE-NUM.  */
 static const yytype_int16 yypact[] =
 {
-     -69,   -81,    27,   -69,   -81,   -81,     8,   -69,   -81,   -81,
-     -81,   -81,    40,    48,     2,   -81,   -81,    33,   139,    11,
-     405,   -81,   -81,     1,   -81,   -81,   405,   -81,   -81,   -81,
-     -81,   -81,   -81,   -81,   104,   106,   107,    90,   272,   -81,
-     -81,   -81,   -81,   405,   405,   -81,   -81,   257,   -69,     8,
-     198,   110,   257,   -81,   -81,   -81,   -81,   -81,   -81,    28,
-     -81,   -81,   -81,     0,    59,    61,    58,    62,   -24,   -30,
-      -5,    15,    -3,    60,   405,    -1,   -81,   -81,    33,   111,
-     117,   -81,   -81,    12,   405,   328,   405,   119,   -81,    64,
-     -81,   -81,    91,   -81,   -81,   118,   -81,   -81,   -81,   405,
-     405,   405,   405,   405,   405,   405,   405,   405,   405,   405,
-     405,   405,   405,   405,   405,   405,   405,   405,   405,   -81,
-     -81,   -81,   -81,   -81,   -81,   -81,   -81,   -81,   -81,   -81,
-     405,   -81,   343,   -81,   -81,   121,   -81,   -69,   -81,    13,
-     328,    20,   -81,   -81,   123,   -81,   -81,     6,    59,   -81,
-      61,    58,    62,   -24,   -30,   -30,    -5,    -5,    -5,    -5,
-      15,    15,    -3,    -3,   -81,   -81,   -81,   -81,   -81,   122,
-     124,   -81,   257,   398,   257,   405,   405,   405,   -81,    99,
-     257,    21,   -81,    22,   -81,   -81,   257,   -81,   257,   131,
-     -81,   -81,   -81
+     -68,   -95,    31,   -68,   -95,   -95,     5,   -68,   -95,   -95,
+     -95,   -95,   -95,    37,    44,    15,   -12,   -95,   -95,   -10,
+     164,     2,   422,   383,   -95,   -95,    45,   -95,    16,   -95,
+     -95,   508,   -95,   -95,    -5,   -95,   -95,   -95,   -95,    54,
+      80,    82,    94,   123,   330,   -95,   -95,   -95,   -95,   508,
+     508,   -95,   -95,   292,   120,   508,    70,   -68,     5,   228,
+     124,   292,   -95,   -95,   -95,   -95,   -95,   -95,   -95,    61,
+     -95,   -95,   -95,     1,    85,    86,    84,    87,    32,    17,
+      11,    26,    13,    91,   508,     4,   -95,   -95,   -10,   140,
+     145,   -95,   -95,   141,   -95,   383,   -95,   -95,    22,   292,
+     508,   368,   508,   149,   -95,   -95,   114,   -95,   -95,   118,
+     508,   100,   292,   -95,   -95,   153,   -95,   -95,   -95,   508,
+     508,   508,   508,   508,   508,   508,   508,   508,   508,   508,
+     508,   508,   508,   508,   508,   508,   508,   508,   508,   -95,
+     -95,   -95,   -95,   -95,   -95,   -95,   -95,   -95,   -95,   -95,
+     508,   -95,   455,   508,   -95,   -95,    45,   -95,   -68,   -95,
+     156,   155,   -95,   -95,    30,   368,    33,   -95,   -95,   157,
+      35,   292,   -95,   -95,   -95,     8,    85,    86,    84,    87,
+      32,    17,    17,    11,    11,    11,    11,    26,    26,    13,
+      13,   -95,   -95,   -95,   -95,   -95,   158,   160,    25,   -95,
+     383,   -95,   292,   493,   292,   508,   292,   -95,   508,   508,
+     -95,   -95,   -95,   129,   292,    41,   -95,    43,   -95,   -95,
+     -95,   292,   -95,   292,   163,   -95,   -95,   -95
 };
 
   /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -2288,45 +3215,48 @@ static const yytype_int16 yypact[] =
 static const yytype_uint8 yydefact[] =
 {
        0,    13,     0,     2,     4,     5,     0,     9,     1,     3,
-       7,    25,     0,    14,    16,    10,     8,     0,     0,     0,
-       0,     6,    15,    16,    43,    31,     0,   116,   117,   111,
-     112,   115,   113,   114,     0,     0,     0,     0,     0,   100,
-     101,    99,    98,     0,     0,   102,   103,     0,    11,     0,
-       0,     0,    18,    20,    22,    23,    39,    21,    24,     0,
-      48,    50,    64,    63,    66,    68,    70,    72,    74,    76,
-      79,    84,    87,    90,     0,    94,   104,    27,     0,     0,
-      28,    17,    35,     0,     0,     0,     0,     0,    46,     0,
-      95,    96,     0,    12,    33,     0,    32,    19,    44,     0,
+       7,    26,    32,     0,    14,    16,     0,    10,     8,     0,
+       0,     0,     0,     0,     6,    32,    31,    15,    16,    53,
+      37,     0,   131,   132,   126,   127,   130,   128,   129,     0,
+       0,     0,     0,     0,     0,   114,   115,   113,   112,     0,
+       0,   116,   117,     0,     0,     0,     0,    11,     0,     0,
+       0,    18,    20,    22,    23,    49,    21,    24,    25,     0,
+      62,    64,    78,    77,    80,    82,    84,    86,    88,    90,
+      93,    98,   101,   104,     0,   108,   118,    28,     0,     0,
+      34,    30,   126,     0,   104,     0,    17,    41,     0,     0,
+       0,     0,     0,     0,    58,    56,     0,   109,   110,     0,
+       0,     0,     0,    12,    39,     0,    38,    19,    54,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,     0,    52,
-      53,    54,    55,    56,    57,    58,    59,    60,    62,    61,
-       0,    97,     0,   107,   108,    30,    26,     0,   118,     0,
-       0,     0,    45,    47,     0,    34,    49,     0,    67,    90,
-      69,    71,    73,    75,    77,    78,    80,    81,    82,    83,
-      85,    86,    88,    89,    91,    92,    93,    51,   105,   109,
-       0,    29,     0,     0,     0,     0,     0,     0,   106,    36,
-       0,     0,    38,     0,    65,   110,     0,    40,     0,     0,
-      37,    41,    42
+       0,     0,     0,     0,     0,     0,     0,     0,     0,    66,
+      67,    68,    69,    70,    71,    72,    73,    74,    76,    75,
+       0,   111,     0,     0,   121,   122,    36,    27,     0,    29,
+      43,     0,   133,    59,     0,     0,     0,    55,    57,     0,
+       0,     0,    61,    40,    63,     0,    81,    83,    85,    87,
+      89,    91,    92,    94,    95,    96,    97,    99,   100,   102,
+     103,   105,   106,   107,    65,   119,   124,     0,     0,    35,
+       0,    42,     0,     0,     0,     0,     0,    60,     0,     0,
+     120,   123,    44,    45,     0,     0,    48,     0,    47,    79,
+     125,     0,    50,     0,     0,    46,    51,    52
 };
 
   /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int16 yypgoto[] =
 {
-     -81,   133,   -81,   -81,    -6,    -4,    89,   -81,   130,   -81,
-       4,   -45,    -2,     3,   -81,   125,   -81,   -81,   -81,   -81,
-     -80,   -81,   -25,   -20,   -81,   -38,   -81,   -81,    50,    47,
-      49,    52,    53,   -35,   -63,   -39,   -37,   -21,   -81,   -81,
-     -23,   -81
+     -95,   173,   -95,   -95,   -11,    -2,   121,   -95,   161,   -95,
+      14,   -49,     0,   -95,    19,   -95,   166,   159,   -17,   -95,
+     -95,   -95,   -94,   -95,   -95,   -30,   -21,   -95,   -19,   -95,
+     -95,    63,    72,    62,    74,    77,    -7,   -36,    -8,     9,
+     -22,   -95,   -95,    -4,   -95
 };
 
   /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int16 yydefgoto[] =
 {
-      -1,     2,     3,     4,     5,     6,    50,     7,    12,    13,
-      51,    52,    23,    79,    80,    53,    81,    54,    55,    56,
-      57,    58,    59,    60,   130,    61,    62,    63,    64,    65,
-      66,    67,    68,    69,    70,    71,    72,    73,    74,    75,
-     170,    76
+      -1,     2,     3,     4,     5,     6,    59,     7,    13,    14,
+      60,    61,    28,    16,    89,    90,    62,   160,   161,    63,
+      64,    65,    66,    67,    68,    69,    70,   150,    71,    72,
+      73,    74,    75,    76,    77,    78,    79,    80,    81,    82,
+      83,    84,    85,   197,    86
 };
 
   /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -2334,149 +3264,176 @@ static const yytype_int16 yydefgoto[] =
      number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_uint8 yytable[] =
 {
-      82,    83,    92,    15,    14,   140,   132,    18,    19,    19,
-      99,    10,    48,    89,    49,    78,    99,    99,     1,    77,
-     138,   172,    90,    91,    99,    99,    99,     8,   174,   188,
-     189,    98,    99,    11,   108,   109,   110,   111,   106,   107,
-      20,    20,    48,    16,    49,   156,   157,   158,   159,   116,
-     117,   118,    17,   131,    95,   100,    97,   101,    11,   139,
-     173,   141,   176,   112,   113,   114,   115,   143,    99,   133,
-     134,   154,   155,   160,   161,   147,   135,   162,   163,   146,
-     149,   149,   149,   149,   149,   149,   149,   149,   149,   149,
-     149,   149,   149,   149,   149,   164,   165,   166,     1,   119,
-     120,   121,   122,   123,   124,   125,   126,   127,   128,   129,
-     167,    84,   169,    85,    86,    87,    96,   102,   104,   136,
-     103,   137,   142,   105,   145,   144,   177,   179,    19,   182,
-     175,   186,   178,    78,   192,   187,     9,    93,   184,    21,
-     171,   190,    24,   191,    18,    25,    26,    22,   181,   150,
-     183,   148,   151,     0,   185,   149,   152,   169,   153,     0,
-      27,     0,     0,    28,    29,    30,    31,     0,    32,    33,
-      34,     0,    35,    36,    37,     0,     0,    38,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,     0,    39,
-      40,    41,     0,     0,     0,     0,     0,     0,     0,     0,
-      42,    24,     0,    18,    94,    26,     0,     0,     0,    43,
-      44,    45,    46,     0,     0,     0,     0,     0,     0,    27,
-       0,    47,    28,    29,    30,    31,     1,    32,    33,    34,
-       0,    35,    36,    37,     0,     0,    38,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,    39,    40,
-      41,     0,     0,     0,     0,     0,     0,     0,     0,    42,
-      24,     0,    18,     0,    26,     0,     0,     0,    43,    44,
-      45,    46,     0,     0,     0,    88,     0,     0,    27,    26,
-      47,    28,    29,    30,    31,     0,    32,    33,    34,     0,
-      35,    36,    37,    27,     0,    38,    28,    29,    30,    31,
-       0,    32,    33,     0,     0,     0,     0,    39,    40,    41,
-       0,     0,     0,     0,     0,     0,     0,     0,    42,     0,
-       0,     0,    39,    40,    41,     0,     0,    43,    44,    45,
-      46,    24,     0,    42,     0,    26,     0,     0,     0,    47,
-       0,     0,    43,    44,    45,    46,     0,     0,     0,    27,
-      26,   168,    28,    29,    30,    31,     0,    32,    33,     0,
-       0,     0,     0,     0,    27,     0,     0,    28,    29,    30,
-      31,     0,    32,    33,     0,     0,     0,     0,    39,    40,
-      41,     0,     0,     0,     0,     0,     0,     0,     0,    42,
-       0,     0,     0,    39,    40,    41,     0,     0,    43,    44,
-      45,    46,     0,     0,    42,    26,   180,     0,     0,     0,
-       0,     0,    26,    43,    44,    45,    46,     0,     0,    27,
-       0,     0,    28,    29,    30,    31,    27,    32,    33,    28,
-      29,    30,    31,     0,    32,    33,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,    39,    40,
-      41,     0,     0,     0,     0,    39,    40,    41,     0,    42,
-       0,     0,     0,     0,     0,     0,    42,     0,    43,    44,
-      45,    46,     0,     0,     0,    43,    44,    45,    46
+      94,    98,    97,    93,   109,    17,    15,   165,    10,    57,
+      87,   152,   119,   153,   106,    11,    26,    11,    58,    88,
+      20,     1,    21,    21,    22,    22,   119,   107,   108,   119,
+     162,     8,    11,    94,   119,   211,   111,   119,   202,   119,
+      18,   204,    25,   206,    12,   119,    57,   119,    19,   223,
+     163,   224,    21,    99,    22,    58,    23,    23,   120,    12,
+     121,   100,   151,   172,   118,   119,   208,   136,   137,   138,
+     164,   203,   166,   115,    97,   117,   154,   155,   134,   135,
+     170,   132,   133,   128,   129,   130,   131,   101,   156,   102,
+     175,     1,   183,   184,   185,   186,   126,   127,   174,    94,
+      94,    94,    94,    94,    94,    94,    94,    94,    94,    94,
+      94,    94,    94,    94,   191,   192,   193,   168,   119,   181,
+     182,   103,   207,   198,   187,   188,   104,   110,   112,   194,
+     116,   196,   139,   140,   141,   142,   143,   144,   145,   146,
+     147,   148,   149,   189,   190,   122,   124,   123,   157,   158,
+     125,   159,   167,   213,   169,   216,    88,   218,   171,   173,
+     200,   201,   209,   221,   205,   222,   227,    29,   210,    20,
+      30,    31,   225,   215,   226,   217,     9,   199,   113,    97,
+      27,    24,    96,   212,   176,   178,    94,    32,   196,   219,
+      33,    34,    35,    36,   177,    37,    38,    39,   179,    40,
+      41,    42,   180,    43,    44,   220,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,    45,    46,    47,     0,
+       0,     0,     0,     0,     0,     0,     0,    48,     0,     0,
+       0,    29,     0,    20,   114,    31,    49,    50,    51,    52,
+       0,     0,     0,     0,     0,     0,     0,     0,    53,    54,
+      55,    32,    56,     1,    33,    34,    35,    36,     0,    37,
+      38,    39,     0,    40,    41,    42,     0,    43,    44,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+      45,    46,    47,     0,     0,     0,     0,     0,     0,     0,
+       0,    48,     0,     0,     0,    29,     0,    20,     0,    31,
+      49,    50,    51,    52,     0,     0,     0,     0,     0,     0,
+       0,     0,    53,    54,    55,    32,    56,     0,    33,    34,
+      35,    36,     0,    37,    38,    39,     0,    40,    41,    42,
+       0,    43,    44,   105,     0,     0,     0,    31,     0,     0,
+       0,     0,     0,     0,    45,    46,    47,     0,     0,     0,
+       0,     0,     0,    32,     0,    48,    33,    92,    35,    36,
+       0,    37,    38,     0,    49,    50,    51,    52,     0,     0,
+       0,    29,     0,     0,     0,    31,    53,    54,    55,     0,
+      56,     0,    45,    46,    47,     0,     0,     0,    95,     0,
+      31,    32,     0,    48,    33,    92,    35,    36,     0,    37,
+      38,     0,    49,    50,    51,    52,    32,     0,     0,    33,
+      92,    35,    36,     0,    37,    38,     0,     0,     0,     0,
+      45,    46,    47,     0,     0,     0,     0,     0,     0,    31,
+       0,    48,    91,     0,     0,    45,    46,    47,     0,     0,
+      49,    50,    51,    52,     0,    32,    48,     0,    33,    92,
+      35,    36,     0,    37,    38,    49,    50,    51,    52,     0,
+       0,     0,    31,   195,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,    45,    46,    47,     0,    32,     0,
+       0,    33,    92,    35,    36,    48,    37,    38,     0,     0,
+       0,     0,     0,     0,    49,    50,    51,    52,     0,     0,
+      31,   214,     0,     0,     0,     0,     0,    45,    46,    47,
+       0,     0,     0,     0,     0,    31,    32,     0,    48,    33,
+      92,    35,    36,     0,    37,    38,     0,    49,    50,    51,
+      52,    32,     0,     0,    33,    92,    35,    36,     0,    37,
+      38,     0,     0,     0,     0,    45,    46,    47,     0,     0,
+       0,     0,     0,     0,     0,     0,    48,     0,     0,     0,
+      45,    46,    47,     0,     0,    49,    50,    51,    52,     0,
+       0,    48,     0,     0,     0,     0,     0,     0,     0,     0,
+      49,    50,    51,    52
 };
 
 static const yytype_int16 yycheck[] =
 {
-      20,    26,    47,     7,     6,    85,     7,     5,     7,     7,
-       4,     3,    18,    38,    18,    19,     4,     4,    87,     8,
-       8,     8,    43,    44,     4,     4,     4,     0,     8,     8,
-       8,     3,     4,    25,    64,    65,    66,    67,    62,    63,
-      39,    39,    48,     3,    48,   108,   109,   110,   111,    52,
-      53,    54,     4,    74,    50,    55,    52,    57,    25,    84,
-     140,    86,    56,    68,    69,    50,    51,     3,     4,    70,
-      71,   106,   107,   112,   113,   100,    78,   114,   115,    99,
-     101,   102,   103,   104,   105,   106,   107,   108,   109,   110,
-     111,   112,   113,   114,   115,   116,   117,   118,    87,    39,
-      40,    41,    42,    43,    44,    45,    46,    47,    48,    49,
-     130,     7,   132,     7,     7,    25,     6,    58,    60,     8,
-      59,     4,     3,    61,     6,    34,     4,   172,     7,   174,
-       7,    32,     8,   137,     3,   180,     3,    48,   176,    14,
-     137,   186,     3,   188,     5,     6,     7,    17,   173,   102,
-     175,   101,   103,    -1,   177,   176,   104,   177,   105,    -1,
-      21,    -1,    -1,    24,    25,    26,    27,    -1,    29,    30,
-      31,    -1,    33,    34,    35,    -1,    -1,    38,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    50,
-      51,    52,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
-      61,     3,    -1,     5,     6,     7,    -1,    -1,    -1,    70,
-      71,    72,    73,    -1,    -1,    -1,    -1,    -1,    -1,    21,
-      -1,    82,    24,    25,    26,    27,    87,    29,    30,    31,
-      -1,    33,    34,    35,    -1,    -1,    38,    -1,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    50,    51,
-      52,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    61,
-       3,    -1,     5,    -1,     7,    -1,    -1,    -1,    70,    71,
-      72,    73,    -1,    -1,    -1,     3,    -1,    -1,    21,     7,
-      82,    24,    25,    26,    27,    -1,    29,    30,    31,    -1,
-      33,    34,    35,    21,    -1,    38,    24,    25,    26,    27,
-      -1,    29,    30,    -1,    -1,    -1,    -1,    50,    51,    52,
-      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    61,    -1,
-      -1,    -1,    50,    51,    52,    -1,    -1,    70,    71,    72,
-      73,     3,    -1,    61,    -1,     7,    -1,    -1,    -1,    82,
-      -1,    -1,    70,    71,    72,    73,    -1,    -1,    -1,    21,
-       7,     8,    24,    25,    26,    27,    -1,    29,    30,    -1,
-      -1,    -1,    -1,    -1,    21,    -1,    -1,    24,    25,    26,
-      27,    -1,    29,    30,    -1,    -1,    -1,    -1,    50,    51,
-      52,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    61,
-      -1,    -1,    -1,    50,    51,    52,    -1,    -1,    70,    71,
-      72,    73,    -1,    -1,    61,     7,     8,    -1,    -1,    -1,
-      -1,    -1,     7,    70,    71,    72,    73,    -1,    -1,    21,
-      -1,    -1,    24,    25,    26,    27,    21,    29,    30,    24,
-      25,    26,    27,    -1,    29,    30,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    50,    51,
-      52,    -1,    -1,    -1,    -1,    50,    51,    52,    -1,    61,
-      -1,    -1,    -1,    -1,    -1,    -1,    61,    -1,    70,    71,
-      72,    73,    -1,    -1,    -1,    70,    71,    72,    73
+      22,    31,    23,    22,    53,     7,     6,   101,     3,    20,
+       8,     7,     4,     9,    44,    27,    16,    27,    20,    21,
+       5,    89,     7,     7,     9,     9,     4,    49,    50,     4,
+       8,     0,    27,    55,     4,    10,    55,     4,     8,     4,
+       3,     8,    54,     8,    54,     4,    57,     4,     4,     8,
+      99,     8,     7,    58,     9,    57,    41,    41,    57,    54,
+      59,     7,    84,   112,     3,     4,    58,    54,    55,    56,
+     100,   165,   102,    59,    95,    61,    72,    73,    52,    53,
+     110,    70,    71,    66,    67,    68,    69,     7,    88,     7,
+     120,    89,   128,   129,   130,   131,    64,    65,   119,   121,
+     122,   123,   124,   125,   126,   127,   128,   129,   130,   131,
+     132,   133,   134,   135,   136,   137,   138,     3,     4,   126,
+     127,    27,   171,   153,   132,   133,     3,     7,    58,   150,
+       6,   152,    41,    42,    43,    44,    45,    46,    47,    48,
+      49,    50,    51,   134,   135,    60,    62,    61,     8,     4,
+      63,    10,     3,   202,    36,   204,   158,   206,    58,     6,
+       4,     6,     4,    34,     7,   214,     3,     3,     8,     5,
+       6,     7,   221,   203,   223,   205,     3,   158,    57,   200,
+      19,    15,    23,   200,   121,   123,   208,    23,   209,   208,
+      26,    27,    28,    29,   122,    31,    32,    33,   124,    35,
+      36,    37,   125,    39,    40,   209,    -1,    -1,    -1,    -1,
+      -1,    -1,    -1,    -1,    -1,    -1,    52,    53,    54,    -1,
+      -1,    -1,    -1,    -1,    -1,    -1,    -1,    63,    -1,    -1,
+      -1,     3,    -1,     5,     6,     7,    72,    73,    74,    75,
+      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    84,    85,
+      86,    23,    88,    89,    26,    27,    28,    29,    -1,    31,
+      32,    33,    -1,    35,    36,    37,    -1,    39,    40,    -1,
+      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
+      52,    53,    54,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
+      -1,    63,    -1,    -1,    -1,     3,    -1,     5,    -1,     7,
+      72,    73,    74,    75,    -1,    -1,    -1,    -1,    -1,    -1,
+      -1,    -1,    84,    85,    86,    23,    88,    -1,    26,    27,
+      28,    29,    -1,    31,    32,    33,    -1,    35,    36,    37,
+      -1,    39,    40,     3,    -1,    -1,    -1,     7,    -1,    -1,
+      -1,    -1,    -1,    -1,    52,    53,    54,    -1,    -1,    -1,
+      -1,    -1,    -1,    23,    -1,    63,    26,    27,    28,    29,
+      -1,    31,    32,    -1,    72,    73,    74,    75,    -1,    -1,
+      -1,     3,    -1,    -1,    -1,     7,    84,    85,    86,    -1,
+      88,    -1,    52,    53,    54,    -1,    -1,    -1,     5,    -1,
+       7,    23,    -1,    63,    26,    27,    28,    29,    -1,    31,
+      32,    -1,    72,    73,    74,    75,    23,    -1,    -1,    26,
+      27,    28,    29,    -1,    31,    32,    -1,    -1,    -1,    -1,
+      52,    53,    54,    -1,    -1,    -1,    -1,    -1,    -1,     7,
+      -1,    63,    10,    -1,    -1,    52,    53,    54,    -1,    -1,
+      72,    73,    74,    75,    -1,    23,    63,    -1,    26,    27,
+      28,    29,    -1,    31,    32,    72,    73,    74,    75,    -1,
+      -1,    -1,     7,     8,    -1,    -1,    -1,    -1,    -1,    -1,
+      -1,    -1,    -1,    -1,    52,    53,    54,    -1,    23,    -1,
+      -1,    26,    27,    28,    29,    63,    31,    32,    -1,    -1,
+      -1,    -1,    -1,    -1,    72,    73,    74,    75,    -1,    -1,
+       7,     8,    -1,    -1,    -1,    -1,    -1,    52,    53,    54,
+      -1,    -1,    -1,    -1,    -1,     7,    23,    -1,    63,    26,
+      27,    28,    29,    -1,    31,    32,    -1,    72,    73,    74,
+      75,    23,    -1,    -1,    26,    27,    28,    29,    -1,    31,
+      32,    -1,    -1,    -1,    -1,    52,    53,    54,    -1,    -1,
+      -1,    -1,    -1,    -1,    -1,    -1,    63,    -1,    -1,    -1,
+      52,    53,    54,    -1,    -1,    72,    73,    74,    75,    -1,
+      -1,    63,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
+      72,    73,    74,    75
 };
 
   /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
      symbol of state STATE-NUM.  */
 static const yytype_uint8 yystos[] =
 {
-       0,    87,    89,    90,    91,    92,    93,    95,     0,    89,
-       3,    25,    96,    97,   100,    93,     3,     4,     5,     7,
-      39,   103,    96,   100,     3,     6,     7,    21,    24,    25,
-      26,    27,    29,    30,    31,    33,    34,    35,    38,    50,
-      51,    52,    61,    70,    71,    72,    73,    82,    92,    93,
-      94,    98,    99,   103,   105,   106,   107,   108,   109,   110,
-     111,   113,   114,   115,   116,   117,   118,   119,   120,   121,
-     122,   123,   124,   125,   126,   127,   129,     8,    93,   101,
-     102,   104,   111,   110,     7,     7,     7,    25,     3,   110,
-     125,   125,    99,    94,     6,    98,     6,    98,     3,     4,
-      55,    57,    58,    59,    60,    61,    62,    63,    64,    65,
-      66,    67,    68,    69,    50,    51,    52,    53,    54,    39,
-      40,    41,    42,    43,    44,    45,    46,    47,    48,    49,
-     112,   125,     7,    70,    71,   100,     8,     4,     8,   110,
-     108,   110,     3,     3,    34,     6,   111,   110,   116,   125,
-     117,   118,   119,   120,   121,   121,   122,   122,   122,   122,
-     123,   123,   124,   124,   125,   125,   125,   111,     8,   111,
-     128,   101,     8,   108,     8,     7,    56,     4,     8,    99,
-       8,   110,    99,   110,   113,   128,    32,    99,     8,     8,
-      99,    99,     3
+       0,    89,    91,    92,    93,    94,    95,    97,     0,    91,
+       3,    27,    54,    98,    99,   102,   103,    95,     3,     4,
+       5,     7,     9,    41,   106,    54,   102,    98,   102,     3,
+       6,     7,    23,    26,    27,    28,    29,    31,    32,    33,
+      35,    36,    37,    39,    40,    52,    53,    54,    63,    72,
+      73,    74,    75,    84,    85,    86,    88,    94,    95,    96,
+     100,   101,   106,   109,   110,   111,   112,   113,   114,   115,
+     116,   118,   119,   120,   121,   122,   123,   124,   125,   126,
+     127,   128,   129,   130,   131,   132,   134,     8,    95,   104,
+     105,    10,    27,   118,   130,     5,   107,   116,   115,    58,
+       7,     7,     7,    27,     3,     3,   115,   130,   130,   101,
+       7,   118,    58,    96,     6,   100,     6,   100,     3,     4,
+      57,    59,    60,    61,    62,    63,    64,    65,    66,    67,
+      68,    69,    70,    71,    52,    53,    54,    55,    56,    41,
+      42,    43,    44,    45,    46,    47,    48,    49,    50,    51,
+     117,   130,     7,     9,    72,    73,   102,     8,     4,    10,
+     107,   108,     8,   101,   115,   112,   115,     3,     3,    36,
+     115,    58,   101,     6,   116,   115,   121,   122,   123,   124,
+     125,   126,   126,   127,   127,   127,   127,   128,   128,   129,
+     129,   130,   130,   130,   116,     8,   116,   133,   115,   104,
+       4,     6,     8,   112,     8,     7,     8,   101,    58,     4,
+       8,    10,   108,   101,     8,   115,   101,   115,   101,   118,
+     133,    34,   101,     8,     8,   101,   101,     3
 };
 
   /* YYR1[YYN] -- Symbol number of symbol that rule YYN derives.  */
 static const yytype_uint8 yyr1[] =
 {
-       0,    88,    89,    89,    90,    90,    91,    92,    92,    93,
-      93,    94,    94,    95,    96,    96,    97,    97,    98,    98,
-      99,    99,    99,    99,    99,   100,   100,   100,   101,   101,
-     102,   103,   103,   103,   103,   104,   105,   105,   106,   106,
-     106,   106,   107,   108,   108,   109,   109,   109,   110,   110,
-     111,   111,   112,   112,   112,   112,   112,   112,   112,   112,
-     112,   112,   112,   113,   113,   114,   115,   115,   116,   116,
-     117,   117,   118,   118,   119,   119,   120,   120,   120,   121,
-     121,   121,   121,   121,   122,   122,   122,   123,   123,   123,
-     124,   124,   124,   124,   125,   125,   125,   125,   126,   126,
-     126,   126,   126,   126,   127,   127,   127,   127,   127,   128,
-     128,   129,   129,   129,   129,   129,   129,   129,   129
+       0,    90,    91,    91,    92,    92,    93,    94,    94,    95,
+      95,    96,    96,    97,    98,    98,    99,    99,   100,   100,
+     101,   101,   101,   101,   101,   101,   102,   102,   102,   102,
+     102,   102,   103,   103,   104,   104,   105,   106,   106,   106,
+     106,   107,   107,   108,   108,   109,   109,   109,   110,   110,
+     110,   110,   111,   112,   112,   113,   113,   113,   113,   114,
+     114,   114,   115,   115,   116,   116,   117,   117,   117,   117,
+     117,   117,   117,   117,   117,   117,   117,   118,   118,   119,
+     120,   120,   121,   121,   122,   122,   123,   123,   124,   124,
+     125,   125,   125,   126,   126,   126,   126,   126,   127,   127,
+     127,   128,   128,   128,   129,   129,   129,   129,   130,   130,
+     130,   130,   131,   131,   131,   131,   131,   131,   132,   132,
+     132,   132,   132,   132,   133,   133,   134,   134,   134,   134,
+     134,   134,   134,   134
 };
 
   /* YYR2[YYN] -- Number of symbols on the right hand side of rule YYN.  */
@@ -2484,16 +3441,18 @@ static const yytype_uint8 yyr2[] =
 {
        0,     2,     1,     2,     1,     1,     3,     2,     3,     1,
        2,     1,     2,     1,     1,     3,     1,     3,     1,     2,
-       1,     1,     1,     1,     1,     1,     4,     3,     1,     3,
-       2,     2,     3,     3,     4,     1,     5,     7,     5,     1,
-       6,     7,     7,     1,     2,     3,     2,     3,     1,     3,
-       1,     3,     1,     1,     1,     1,     1,     1,     1,     1,
-       1,     1,     1,     1,     1,     5,     1,     3,     1,     3,
-       1,     3,     1,     3,     1,     3,     1,     3,     3,     1,
-       3,     3,     3,     3,     1,     3,     3,     1,     3,     3,
-       1,     3,     3,     3,     1,     2,     2,     2,     1,     1,
-       1,     1,     1,     1,     1,     3,     4,     2,     2,     1,
-       3,     1,     1,     1,     1,     1,     1,     1,     3
+       1,     1,     1,     1,     1,     1,     1,     4,     3,     4,
+       3,     2,     1,     2,     1,     3,     2,     2,     3,     3,
+       4,     1,     3,     1,     3,     5,     7,     5,     5,     1,
+       6,     7,     7,     1,     2,     3,     2,     3,     2,     3,
+       4,     3,     1,     3,     1,     3,     1,     1,     1,     1,
+       1,     1,     1,     1,     1,     1,     1,     1,     1,     5,
+       1,     3,     1,     3,     1,     3,     1,     3,     1,     3,
+       1,     3,     3,     1,     3,     3,     3,     3,     1,     3,
+       3,     1,     3,     3,     1,     3,     3,     3,     1,     2,
+       2,     2,     1,     1,     1,     1,     1,     1,     1,     3,
+       4,     2,     2,     4,     1,     3,     1,     1,     1,     1,
+       1,     1,     1,     3
 };
 
 
@@ -3170,673 +4129,763 @@ yyreduce:
   switch (yyn)
     {
         case 2:
-#line 1718 "src/c_parser.y" /* yacc.c:1661  */
+#line 2640 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.File) = new File((yyvsp[0].Ext_Decl)); root = (yyval.File);}
-#line 3176 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4135 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 3:
-#line 1719 "src/c_parser.y" /* yacc.c:1661  */
+#line 2641 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.File) = new File((yyvsp[-1].Ext_Decl), (yyvsp[0].File)); root = (yyval.File);}
-#line 3182 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4141 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 4:
-#line 1722 "src/c_parser.y" /* yacc.c:1661  */
+#line 2644 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Ext_Decl) = new ExternalDecl((yyvsp[0].Func_Def));}
-#line 3188 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4147 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 5:
-#line 1723 "src/c_parser.y" /* yacc.c:1661  */
+#line 2645 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Ext_Decl) = new ExternalDecl(NULL, (yyvsp[0].Decl));}
-#line 3194 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4153 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 6:
-#line 1726 "src/c_parser.y" /* yacc.c:1661  */
+#line 2648 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Func_Def) = new FuncDef((yyvsp[-2].Decl_Spec),(yyvsp[-1].Declr),(yyvsp[0].Comp_Stat));}
-#line 3200 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4159 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 7:
-#line 1729 "src/c_parser.y" /* yacc.c:1661  */
+#line 2651 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Decl) = new Decl((yyvsp[-1].Decl_Spec));}
-#line 3206 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4165 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 8:
-#line 1730 "src/c_parser.y" /* yacc.c:1661  */
+#line 2652 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Decl) = new Decl((yyvsp[-2].Decl_Spec), (yyvsp[-1].Init_List));}
-#line 3212 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4171 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 9:
-#line 1733 "src/c_parser.y" /* yacc.c:1661  */
+#line 2655 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Decl_Spec) = new DeclSpec((yyvsp[0].Type_Spec));}
-#line 3218 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4177 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 10:
-#line 1734 "src/c_parser.y" /* yacc.c:1661  */
+#line 2656 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Decl_Spec) = new DeclSpec((yyvsp[-1].Type_Spec), (yyvsp[0].Decl_Spec));}
-#line 3224 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4183 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 11:
-#line 1737 "src/c_parser.y" /* yacc.c:1661  */
+#line 2659 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Decl_List) = new DeclList((yyvsp[0].Decl));}
-#line 3230 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4189 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 12:
-#line 1738 "src/c_parser.y" /* yacc.c:1661  */
+#line 2660 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Decl_List) = new DeclList((yyvsp[-1].Decl),(yyvsp[0].Decl_List));}
-#line 3236 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4195 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 13:
-#line 1741 "src/c_parser.y" /* yacc.c:1661  */
+#line 2663 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Type_Spec) = new TypeSpec((yyvsp[0].string));}
-#line 3242 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4201 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 14:
-#line 1744 "src/c_parser.y" /* yacc.c:1661  */
+#line 2666 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Init_List) = new InitList((yyvsp[0].Init_Declr)); }
-#line 3248 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4207 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 15:
-#line 1745 "src/c_parser.y" /* yacc.c:1661  */
+#line 2667 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Init_List) = new InitList((yyvsp[-2].Init_Declr), (yyvsp[0].Init_List));}
-#line 3254 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4213 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 16:
-#line 1748 "src/c_parser.y" /* yacc.c:1661  */
+#line 2670 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Init_Declr) = new InitDeclr((yyvsp[0].Declr));}
-#line 3260 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4219 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 17:
-#line 1749 "src/c_parser.y" /* yacc.c:1661  */
+#line 2671 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Init_Declr) = new InitDeclr((yyvsp[-2].Declr), (yyvsp[0].Init_Val));}
-#line 3266 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4225 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 18:
-#line 1752 "src/c_parser.y" /* yacc.c:1661  */
+#line 2674 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Stat_List) = new StatList((yyvsp[0].Stat));}
-#line 3272 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4231 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 19:
-#line 1753 "src/c_parser.y" /* yacc.c:1661  */
+#line 2675 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Stat_List) = new StatList((yyvsp[-1].Stat),(yyvsp[0].Stat_List));}
-#line 3278 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4237 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 20:
-#line 1756 "src/c_parser.y" /* yacc.c:1661  */
+#line 2678 "src/c_parser.y" /* yacc.c:1661  */
     {}
-#line 3284 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4243 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 21:
-#line 1757 "src/c_parser.y" /* yacc.c:1661  */
+#line 2679 "src/c_parser.y" /* yacc.c:1661  */
     {}
-#line 3290 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4249 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 22:
-#line 1758 "src/c_parser.y" /* yacc.c:1661  */
+#line 2680 "src/c_parser.y" /* yacc.c:1661  */
     {}
-#line 3296 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4255 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 23:
-#line 1759 "src/c_parser.y" /* yacc.c:1661  */
+#line 2681 "src/c_parser.y" /* yacc.c:1661  */
     {}
-#line 3302 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4261 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 24:
-#line 1760 "src/c_parser.y" /* yacc.c:1661  */
+#line 2682 "src/c_parser.y" /* yacc.c:1661  */
     {}
-#line 3308 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4267 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 25:
-#line 1763 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Declr) = new Declr((yyvsp[0].string));}
-#line 3314 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2683 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4273 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 26:
-#line 1764 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Declr) = new Declr("", (yyvsp[-3].Declr), (yyvsp[-1].Param_List), 1);}
-#line 3320 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2686 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Declr) = new Declr((yyvsp[0].string));}
+#line 4279 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 27:
-#line 1765 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Declr) = new Declr("", (yyvsp[-2].Declr), NULL, 1);}
-#line 3326 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2687 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Declr) = new Declr("", (yyvsp[-3].Declr), (yyvsp[-1].Param_List), 1);}
+#line 4285 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 28:
-#line 1768 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Param_List) = new ParamList((yyvsp[0].Param_Decl));}
-#line 3332 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2688 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Declr) = new Declr("", (yyvsp[-2].Declr), NULL, 1);}
+#line 4291 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 29:
-#line 1769 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Param_List) = new ParamList((yyvsp[-2].Param_Decl), (yyvsp[0].Param_List));}
-#line 3338 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2689 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Declr) = new Declr("",(yyvsp[-3].Declr),NULL,0,(yyvsp[-1].Cond_Expr),true);}
+#line 4297 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 30:
-#line 1772 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Param_Decl) = new ParamDecl((yyvsp[-1].Decl_Spec),(yyvsp[0].Declr));}
-#line 3344 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2690 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Declr) = new Declr("",(yyvsp[-2].Declr),NULL,0,NULL,true);}
+#line 4303 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 31:
-#line 1775 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Comp_Stat) = new CompStat();}
-#line 3350 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2691 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Declr) = new Declr("",(yyvsp[0].Declr),NULL,0,NULL,false,(yyvsp[-1].Pntr));}
+#line 4309 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 32:
-#line 1776 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Comp_Stat) = new CompStat((yyvsp[-1].Stat_List));}
-#line 3356 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2694 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Pntr) = new Pointer(NULL);}
+#line 4315 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 33:
-#line 1777 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Comp_Stat) = new CompStat(NULL,(yyvsp[-1].Decl_List));}
-#line 3362 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2695 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Pntr) = new Pointer((yyvsp[-1].Pntr));}
+#line 4321 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 34:
-#line 1778 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Comp_Stat) = new CompStat((yyvsp[-1].Stat_List),(yyvsp[-2].Decl_List));}
-#line 3368 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2698 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Param_List) = new ParamList((yyvsp[0].Param_Decl));}
+#line 4327 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 35:
-#line 1781 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Init_Val) = new InitVal((yyvsp[0].Ass_Expr));}
-#line 3374 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2699 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Param_List) = new ParamList((yyvsp[-2].Param_Decl), (yyvsp[0].Param_List));}
+#line 4333 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 36:
-#line 1784 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Selec_Stat) = new SelecStat((yyvsp[-2]._Expr),(yyvsp[0].Stat));}
-#line 3380 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2702 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Param_Decl) = new ParamDecl((yyvsp[-1].Decl_Spec),(yyvsp[0].Declr));}
+#line 4339 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 37:
-#line 1785 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Selec_Stat) = new SelecStat((yyvsp[-4]._Expr),(yyvsp[-2].Stat),(yyvsp[0].Stat));}
-#line 3386 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2705 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Comp_Stat) = new CompStat();}
+#line 4345 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 38:
-#line 1788 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Loop_Stat) = new LoopStat(NULL,NULL,(yyvsp[-2]._Expr),(yyvsp[0].Stat));}
-#line 3392 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2706 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Comp_Stat) = new CompStat((yyvsp[-1].Stat_List));}
+#line 4351 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 39:
-#line 1789 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Loop_Stat) = new LoopStat(NULL,NULL,NULL,NULL,(yyvsp[0].Do_Stat));}
-#line 3398 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2707 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Comp_Stat) = new CompStat(NULL,(yyvsp[-1].Decl_List));}
+#line 4357 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 40:
-#line 1790 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Loop_Stat) = new LoopStat((yyvsp[-3].Expr_Stat),(yyvsp[-2].Expr_Stat),NULL,(yyvsp[0].Stat));}
-#line 3404 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2708 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Comp_Stat) = new CompStat((yyvsp[-1].Stat_List),(yyvsp[-2].Decl_List));}
+#line 4363 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 41:
-#line 1791 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Loop_Stat) = new LoopStat((yyvsp[-4].Expr_Stat),(yyvsp[-3].Expr_Stat),(yyvsp[-2]._Expr),(yyvsp[0].Stat));}
-#line 3410 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2711 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Init_Val) = new InitVal((yyvsp[0].Ass_Expr));}
+#line 4369 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 42:
-#line 1794 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Do_Stat) = new DoStat((yyvsp[-5].Stat),(yyvsp[-2]._Expr));}
-#line 3416 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2712 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Init_Val) = new InitVal(NULL,(yyvsp[-1].Init_Val_List));}
+#line 4375 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 43:
-#line 1797 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Expr_Stat) = new ExprStat();}
-#line 3422 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2715 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Init_Val_List) = new InitValList((yyvsp[0].Init_Val));}
+#line 4381 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 44:
-#line 1798 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Expr_Stat) = new ExprStat((yyvsp[-1]._Expr));}
-#line 3428 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2716 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Init_Val_List) = new InitValList((yyvsp[-2].Init_Val),(yyvsp[0].Init_Val_List));}
+#line 4387 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 45:
-#line 1801 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3434 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2719 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Selec_Stat) = new SelecStat((yyvsp[-2]._Expr),(yyvsp[0].Stat));}
+#line 4393 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 46:
-#line 1802 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.tree_node) = new JumpStat(NULL, "return");}
-#line 3440 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2720 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Selec_Stat) = new SelecStat((yyvsp[-4]._Expr),(yyvsp[-2].Stat),(yyvsp[0].Stat));}
+#line 4399 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 47:
-#line 1803 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.tree_node) = new JumpStat((yyvsp[-1]._Expr), "return");}
-#line 3446 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2721 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Selec_Stat) = new SelecStat((yyvsp[-2]._Expr),NULL,NULL,(yyvsp[0].Stat));}
+#line 4405 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 48:
-#line 1806 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval._Expr) = new Expr((yyvsp[0].Ass_Expr));}
-#line 3452 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2724 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Loop_Stat) = new LoopStat(NULL,NULL,(yyvsp[-2]._Expr),(yyvsp[0].Stat));}
+#line 4411 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 49:
-#line 1807 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval._Expr) = new Expr((yyvsp[0].Ass_Expr),(yyvsp[-2]._Expr));}
-#line 3458 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2725 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Loop_Stat) = new LoopStat(NULL,NULL,NULL,NULL,(yyvsp[0].Do_Stat));}
+#line 4417 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 50:
-#line 1810 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Ass_Expr) = new AssExpr((yyvsp[0].Cond_Expr));}
-#line 3464 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2726 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Loop_Stat) = new LoopStat((yyvsp[-3].Expr_Stat),(yyvsp[-2].Expr_Stat),NULL,(yyvsp[0].Stat));}
+#line 4423 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 51:
-#line 1811 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Ass_Expr) = new AssExpr(NULL,(yyvsp[-2].Unary_Expr),(yyvsp[-1].string),(yyvsp[0].Ass_Expr));}
-#line 3470 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2727 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Loop_Stat) = new LoopStat((yyvsp[-4].Expr_Stat),(yyvsp[-3].Expr_Stat),(yyvsp[-2]._Expr),(yyvsp[0].Stat));}
+#line 4429 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 52:
-#line 1814 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3476 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2730 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Do_Stat) = new DoStat((yyvsp[-5].Stat),(yyvsp[-2]._Expr));}
+#line 4435 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 53:
-#line 1815 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3482 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2733 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Expr_Stat) = new ExprStat();}
+#line 4441 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 54:
-#line 1816 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3488 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2734 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Expr_Stat) = new ExprStat((yyvsp[-1]._Expr));}
+#line 4447 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 55:
-#line 1817 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3494 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2737 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.tree_node) = new JumpStat(NULL,"goto",(yyvsp[-1].string));}
+#line 4453 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 56:
-#line 1818 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3500 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2738 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.tree_node) = new JumpStat(NULL, "return");}
+#line 4459 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 57:
-#line 1819 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3506 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2739 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.tree_node) = new JumpStat((yyvsp[-1]._Expr), "return");}
+#line 4465 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 58:
-#line 1820 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3512 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2740 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.tree_node) = new JumpStat(NULL, "break");}
+#line 4471 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 59:
-#line 1821 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3518 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2743 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Tag_Stat) = new TagStat((yyvsp[0].Stat), NULL, (yyvsp[-2].string));}
+#line 4477 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 60:
-#line 1822 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3524 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2744 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Tag_Stat) = new TagStat((yyvsp[0].Stat),(yyvsp[-2].Cond_Expr));}
+#line 4483 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 61:
-#line 1823 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3530 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2745 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Tag_Stat) = new TagStat((yyvsp[0].Stat));}
+#line 4489 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 62:
-#line 1824 "src/c_parser.y" /* yacc.c:1661  */
-    {}
-#line 3536 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2748 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval._Expr) = new Expr((yyvsp[0].Ass_Expr));}
+#line 4495 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 63:
-#line 1827 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Cond_Expr) = new CondExpr((yyvsp[0].Express));}
-#line 3542 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2749 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval._Expr) = new Expr((yyvsp[0].Ass_Expr),(yyvsp[-2]._Expr));}
+#line 4501 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 64:
-#line 1828 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Cond_Expr) = new CondExpr(NULL, (yyvsp[0].IE_Expr));}
-#line 3548 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2752 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Ass_Expr) = new AssExpr((yyvsp[0].Cond_Expr));}
+#line 4507 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 65:
-#line 1831 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.IE_Expr) = new IfElseExpr((yyvsp[-4].Express),(yyvsp[-2]._Expr),(yyvsp[0].Cond_Expr));}
-#line 3554 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2753 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Ass_Expr) = new AssExpr(NULL,(yyvsp[-2].Unary_Expr),(yyvsp[-1].string),(yyvsp[0].Ass_Expr));}
+#line 4513 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 66:
-#line 1834 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[0].Express));}
-#line 3560 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2756 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4519 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 67:
-#line 1835 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"||");}
-#line 3566 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2757 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4525 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 68:
-#line 1838 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[0].Express));}
-#line 3572 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2758 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4531 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 69:
-#line 1839 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"&&");}
-#line 3578 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2759 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4537 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 70:
-#line 1842 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[0].Express));}
-#line 3584 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2760 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4543 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 71:
-#line 1843 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[0].Express),(yyvsp[-2].Express),"|");}
-#line 3590 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2761 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4549 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 72:
-#line 1846 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[0].Express));}
-#line 3596 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2762 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4555 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 73:
-#line 1847 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"^");}
-#line 3602 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2763 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4561 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 74:
-#line 1850 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[0].Express));}
-#line 3608 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2764 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4567 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 75:
-#line 1851 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"&");}
-#line 3614 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2765 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4573 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 76:
-#line 1854 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[0].Express));}
-#line 3620 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2766 "src/c_parser.y" /* yacc.c:1661  */
+    {}
+#line 4579 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 77:
-#line 1855 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"==");}
-#line 3626 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2769 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Cond_Expr) = new CondExpr((yyvsp[0].Express));}
+#line 4585 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 78:
-#line 1856 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"!=");}
-#line 3632 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2770 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Cond_Expr) = new CondExpr(NULL, (yyvsp[0].IE_Expr));}
+#line 4591 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 79:
-#line 1859 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[0].Express));}
-#line 3638 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2773 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.IE_Expr) = new IfElseExpr((yyvsp[-4].Express),(yyvsp[-2]._Expr),(yyvsp[0].Cond_Expr));}
+#line 4597 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 80:
-#line 1860 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"<");}
-#line 3644 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2776 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[0].Express));}
+#line 4603 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 81:
-#line 1861 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),">");}
-#line 3650 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2777 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"||");}
+#line 4609 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 82:
-#line 1862 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"<=");}
-#line 3656 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2780 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[0].Express));}
+#line 4615 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 83:
-#line 1863 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),">=");}
-#line 3662 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2781 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"&&");}
+#line 4621 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 84:
-#line 1866 "src/c_parser.y" /* yacc.c:1661  */
+#line 2784 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Express) = new Expression((yyvsp[0].Express));}
-#line 3668 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4627 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 85:
-#line 1867 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"<<");}
-#line 3674 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2785 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[0].Express),(yyvsp[-2].Express),"|");}
+#line 4633 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 86:
-#line 1868 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),">>");}
-#line 3680 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2788 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[0].Express));}
+#line 4639 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 87:
-#line 1871 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[0].Express));}
-#line 3686 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2789 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"^");}
+#line 4645 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 88:
-#line 1872 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"+");}
-#line 3692 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2792 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[0].Express));}
+#line 4651 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 89:
-#line 1873 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"-");}
-#line 3698 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2793 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"&");}
+#line 4657 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 90:
-#line 1876 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression(NULL,NULL,"",(yyvsp[0].Unary_Expr));}
-#line 3704 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2796 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[0].Express));}
+#line 4663 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 91:
-#line 1877 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),NULL,"*",(yyvsp[0].Unary_Expr));}
-#line 3710 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2797 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"==");}
+#line 4669 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 92:
-#line 1878 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),NULL,"/",(yyvsp[0].Unary_Expr));}
-#line 3716 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2798 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"!=");}
+#line 4675 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 93:
-#line 1879 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Express) = new Expression((yyvsp[-2].Express),NULL,"%",(yyvsp[0].Unary_Expr));}
-#line 3722 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2801 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[0].Express));}
+#line 4681 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 94:
-#line 1882 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Unary_Expr) = new UnaryExpr((yyvsp[0].Postfix_Expr));}
-#line 3728 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2802 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"<");}
+#line 4687 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 95:
-#line 1883 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Unary_Expr) = new UnaryExpr(NULL,(yyvsp[0].Unary_Expr),(yyvsp[-1].string));}
-#line 3734 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2803 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),">");}
+#line 4693 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 96:
-#line 1884 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Unary_Expr) = new UnaryExpr(NULL,(yyvsp[0].Unary_Expr),(yyvsp[-1].string));}
-#line 3740 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2804 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"<=");}
+#line 4699 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 97:
-#line 1885 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Unary_Expr) = new UnaryExpr(NULL,(yyvsp[0].Unary_Expr),(yyvsp[-1].string));}
-#line 3746 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2805 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),">=");}
+#line 4705 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 98:
+#line 2808 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[0].Express));}
+#line 4711 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 99:
+#line 2809 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"<<");}
+#line 4717 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 100:
+#line 2810 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),">>");}
+#line 4723 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 101:
+#line 2813 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[0].Express));}
+#line 4729 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 102:
+#line 2814 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"+");}
+#line 4735 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 103:
+#line 2815 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),(yyvsp[0].Express),"-");}
+#line 4741 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 104:
-#line 1896 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Postfix_Expr) = new PostFixExpr((yyvsp[0].Prim_Expr));}
-#line 3752 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2818 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression(NULL,NULL,"",(yyvsp[0].Unary_Expr));}
+#line 4747 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 105:
-#line 1897 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Postfix_Expr) = new PostFixExpr(NULL,(yyvsp[-2].Postfix_Expr));}
-#line 3758 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2819 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),NULL,"*",(yyvsp[0].Unary_Expr));}
+#line 4753 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 106:
-#line 1898 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Postfix_Expr) = new PostFixExpr(NULL,(yyvsp[-3].Postfix_Expr),"",(yyvsp[-1].Arg_List));}
-#line 3764 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2820 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),NULL,"/",(yyvsp[0].Unary_Expr));}
+#line 4759 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 107:
-#line 1899 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Postfix_Expr) = new PostFixExpr(NULL, (yyvsp[-1].Postfix_Expr), (yyvsp[0].string));}
-#line 3770 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2821 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Express) = new Expression((yyvsp[-2].Express),NULL,"%",(yyvsp[0].Unary_Expr));}
+#line 4765 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 108:
-#line 1900 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Postfix_Expr) = new PostFixExpr(NULL, (yyvsp[-1].Postfix_Expr), (yyvsp[0].string));}
-#line 3776 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2824 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Unary_Expr) = new UnaryExpr((yyvsp[0].Postfix_Expr));}
+#line 4771 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 109:
-#line 1903 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Arg_List) = new ArgList((yyvsp[0].Ass_Expr));}
-#line 3782 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2825 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Unary_Expr) = new UnaryExpr(NULL,(yyvsp[0].Unary_Expr),(yyvsp[-1].string));}
+#line 4777 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 110:
-#line 1904 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Arg_List) = new ArgList((yyvsp[-2].Ass_Expr),(yyvsp[0].Arg_List));}
-#line 3788 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2826 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Unary_Expr) = new UnaryExpr(NULL,(yyvsp[0].Unary_Expr),(yyvsp[-1].string));}
+#line 4783 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 111:
-#line 1907 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),0);}
-#line 3794 "c_parser.tab.c" /* yacc.c:1661  */
-    break;
-
-  case 112:
-#line 1908 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),1);}
-#line 3800 "c_parser.tab.c" /* yacc.c:1661  */
-    break;
-
-  case 113:
-#line 1909 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),2);}
-#line 3806 "c_parser.tab.c" /* yacc.c:1661  */
-    break;
-
-  case 114:
-#line 1910 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),3);}
-#line 3812 "c_parser.tab.c" /* yacc.c:1661  */
-    break;
-
-  case 115:
-#line 1911 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),4);}
-#line 3818 "c_parser.tab.c" /* yacc.c:1661  */
-    break;
-
-  case 116:
-#line 1912 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),5);}
-#line 3824 "c_parser.tab.c" /* yacc.c:1661  */
-    break;
-
-  case 117:
-#line 1913 "src/c_parser.y" /* yacc.c:1661  */
-    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),6);}
-#line 3830 "c_parser.tab.c" /* yacc.c:1661  */
+#line 2827 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Unary_Expr) = new UnaryExpr(NULL,(yyvsp[0].Unary_Expr),(yyvsp[-1].string));}
+#line 4789 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
   case 118:
-#line 1914 "src/c_parser.y" /* yacc.c:1661  */
+#line 2838 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Postfix_Expr) = new PostFixExpr((yyvsp[0].Prim_Expr));}
+#line 4795 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 119:
+#line 2839 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Postfix_Expr) = new PostFixExpr(NULL,(yyvsp[-2].Postfix_Expr));}
+#line 4801 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 120:
+#line 2840 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Postfix_Expr) = new PostFixExpr(NULL,(yyvsp[-3].Postfix_Expr),"",(yyvsp[-1].Arg_List));}
+#line 4807 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 121:
+#line 2841 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Postfix_Expr) = new PostFixExpr(NULL, (yyvsp[-1].Postfix_Expr), (yyvsp[0].string));}
+#line 4813 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 122:
+#line 2842 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Postfix_Expr) = new PostFixExpr(NULL, (yyvsp[-1].Postfix_Expr), (yyvsp[0].string));}
+#line 4819 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 123:
+#line 2843 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Postfix_Expr) = new PostFixExpr(NULL, (yyvsp[-3].Postfix_Expr), "", NULL, (yyvsp[-1]._Expr),true);}
+#line 4825 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 124:
+#line 2846 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Arg_List) = new ArgList((yyvsp[0].Ass_Expr));}
+#line 4831 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 125:
+#line 2847 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Arg_List) = new ArgList((yyvsp[-2].Ass_Expr),(yyvsp[0].Arg_List));}
+#line 4837 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 126:
+#line 2850 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),0);}
+#line 4843 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 127:
+#line 2851 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),1);}
+#line 4849 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 128:
+#line 2852 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),2);}
+#line 4855 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 129:
+#line 2853 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),3);}
+#line 4861 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 130:
+#line 2854 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),4);}
+#line 4867 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 131:
+#line 2855 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),5);}
+#line 4873 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 132:
+#line 2856 "src/c_parser.y" /* yacc.c:1661  */
+    {(yyval.Prim_Expr) = new PrimExpr((yyvsp[0].string),6);}
+#line 4879 "c_parser.tab.c" /* yacc.c:1661  */
+    break;
+
+  case 133:
+#line 2857 "src/c_parser.y" /* yacc.c:1661  */
     {(yyval.Prim_Expr) = new PrimExpr("",-1,(yyvsp[-1]._Expr));}
-#line 3836 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4885 "c_parser.tab.c" /* yacc.c:1661  */
     break;
 
 
-#line 3840 "c_parser.tab.c" /* yacc.c:1661  */
+#line 4889 "c_parser.tab.c" /* yacc.c:1661  */
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -4064,7 +5113,7 @@ yyreturn:
 #endif
   return yyresult;
 }
-#line 1916 "src/c_parser.y" /* yacc.c:1906  */
+#line 2859 "src/c_parser.y" /* yacc.c:1906  */
 
 
 int yyerror(const char* s)
@@ -4076,6 +5125,7 @@ int yyerror(const char* s)
 int main() 
 {
 	yyparse();
-	root->generate_code(); 
+	root->generate_code();
+	TUnit << "\t.data\n" << ArrayLabel.str() << std::endl; 
 	std::cout << "\t.text\n" << TUnit.str(); 
 }

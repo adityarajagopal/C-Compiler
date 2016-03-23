@@ -32,7 +32,6 @@ std::map<std::string, std::vector<Tag> > VarTagMap;
 std::map<std::string, int> FuncMap;
 std::map<Tag, int> ReturnValMap;
 std::map<Tag, bool> IsArray;
-std::map<Tag, bool> IsPointer;
 
 std::vector<Tag> Arguments;
 std::vector<int> Breaks; 
@@ -285,7 +284,7 @@ void InitDeclr::generate_code()
 	}
 }
 
-Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list, int _fd, CondExpr* _cond_expr, bool _is_array, Pointer* _pointer) : id(_id), declr(_declr), param_list(_param_list), func_dec(_fd), cond_expr(_cond_expr), is_array(_is_array), pointer(_pointer) {}
+Declr::Declr(std::string _id, Declr* _declr, ParamList* _param_list, int _fd, CondExpr* _cond_expr, bool _is_array) : id(_id), declr(_declr), param_list(_param_list), func_dec(_fd), cond_expr(_cond_expr), is_array(_is_array) {}
 
 void Declr::print()
 {
@@ -350,16 +349,6 @@ void Declr::generate_code()
 			ArrayLabel << "0";
 		}
 	}
-
-	if(pointer != NULL)
-	{
-		std::string d_tag; 
-		if(declr != NULL) 
-		{
-			declr->get_tag(d_tag);
-		}
-		IsPointer[d_tag] = true; 	
-	}
 }
 std::string Declr::get_id()
 {
@@ -380,8 +369,6 @@ void Declr::set_is_array()
 		IsArray[tag] = true;
 	}
 }
-
-Pointer::Pointer(Pointer* _pointer) : pointer(_pointer) {}
 
 InitVal::InitVal(AssExpr* _ass_expr, InitValList* _init_val_list) : ass_expr(_ass_expr), init_val_list(_init_val_list) {}
 void InitVal::print()
@@ -546,7 +533,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -579,7 +566,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -610,7 +597,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -643,7 +630,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -680,7 +667,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -717,7 +704,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -754,7 +741,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -787,7 +774,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -820,7 +807,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -853,7 +840,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -886,7 +873,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array" || type == "pointer")
+		if(type == "array")
 		{
 			lhs_tag="";
 			rhs_tag="";
@@ -1226,7 +1213,7 @@ void Stat::generate_code()
 }
 */
 
-JumpStat::JumpStat(Expr* _expr, std::string _type, std::string _id) : expr(_expr), type(_type), id(_id) {} 
+JumpStat::JumpStat(Expr* _expr, std::string _type) : expr(_expr), type(_type) {} 
 void JumpStat::generate_code()
 {
 	if(type == "return")
@@ -1249,13 +1236,6 @@ void JumpStat::generate_code()
 	if(type == "break")
 	{
 		os << "\tj\t" << "break_" << Breaks.back() << std::endl;  
-		os << "\tnop" << std::endl; 
-	}
-
-	if(type == "goto")
-	{
-		os << "\tj\t" << "tag_" << id << std::endl; 
-		os << "\tnop" << std::endl;
 	}
 }
 void JumpStat::get_max_arguments(int& _offset) 
@@ -1352,97 +1332,25 @@ void Expression::generate_code()
 	
 	if(op == "+")
 	{
-		std::string lhs_type = "";
-		std::string rhs_type = ""; 
-		if(lhs != NULL) 
-		{
-			lhs->get_tag(tag_lhs);
-			lhs->get_type(lhs_type);
-		}
-		if(rhs != NULL) 
-		{
-			rhs->get_tag(tag_rhs);
-			rhs->get_type(rhs_type); 
-		}
-		if(rhs_type == "pointer" && lhs_type == "pointer")
-		{
-			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
-			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-			os << "\tsra" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
-			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-		}
-		else if(lhs_type == "pointer")
-		{
-			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
-			os << "\tsll" << "\t$" << TMP2 << ",$" << TMP2 << ",2" << std::endl; 
-			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-		}
-		else if(rhs_type == "pointer")
-		{
-			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
-			os << "\tsll" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
-			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-		}
-		if(rhs_type != "pointer" && lhs_type != "pointer")
-		{
-			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-			os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-		}
+		if(lhs != NULL) lhs->get_tag(tag_lhs);
+		if(rhs != NULL) rhs->get_tag(tag_rhs);
+
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tadd" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		
 	}
 
 	if(op == "-")
 	{
-		std::string lhs_type = "";
-		std::string rhs_type = ""; 
-		if(lhs != NULL) 
-		{
-			lhs->get_tag(tag_lhs);
-			lhs->get_type(lhs_type);
-		}
-		if(rhs != NULL) 
-		{
-			rhs->get_tag(tag_rhs);
-			rhs->get_type(rhs_type); 
-		}
-		if(rhs_type == "pointer" && lhs_type == "pointer")
-		{
-			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
-			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-			os << "\tsra" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
-			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-		}
-		else if(lhs_type == "pointer")
-		{
-			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
-			os << "\tsll" << "\t$" << TMP2 << ",$" << TMP2 << ",2" << std::endl; 
-			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-		}
-		else if(rhs_type == "pointer")
-		{
-			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl;
-			os << "\tsll" << "\t$" << TMP1 << ",$" << TMP1 << ",2" << std::endl; 
-			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-		}
-		if(rhs_type != "pointer" && lhs_type != "pointer")
-		{
-			os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
-			os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
-			os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
-			os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;
-		}
+		if(lhs != NULL)	lhs->get_tag(tag_lhs);
+		if(rhs != NULL)	rhs->get_tag(tag_rhs);
+
+		os << "\tlw" << "\t$" << TMP1 << "," << OffsetMap[tag_lhs] << "($fp)" << std::endl; 
+		os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[tag_rhs] << "($fp)" << std::endl; 
+		os << "\tsub" << "\t$" << TMP1 << ",$" << TMP1 << ",$" << TMP2 << std::endl; 
+		os << "\tsw" << "\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 	}
 
 	if(op == "*")
@@ -1694,7 +1602,7 @@ void Expression::set_modify(bool status)
 	if(unary_expr != NULL) {unary_expr->set_modify(status);}
 }
 
-UnaryExpr::UnaryExpr(PostFixExpr* _post_fix_expr, UnaryExpr* _unary_expr, std::string _unary_op) : post_fix_expr(_post_fix_expr), unary_expr(_unary_expr), unary_op(_unary_op), modify(false) {}
+UnaryExpr::UnaryExpr(PostFixExpr* _post_fix_expr, UnaryExpr* _unary_expr, std::string _unary_op) : post_fix_expr(_post_fix_expr), unary_expr(_unary_expr), unary_op(_unary_op) {}
 void UnaryExpr::print()
 {
 	if(post_fix_expr != NULL)
@@ -1716,18 +1624,6 @@ void UnaryExpr::generate_code()
 {
 	if(post_fix_expr != NULL) {post_fix_expr->generate_code();}
 	
-	if(unary_expr != NULL && (unary_op == "++" || unary_op == "--")) 
-	{
-		std::string type = "";
-		unary_expr->get_type(type);
-		//os << type << std::endl; 
-		if(type == "array") 
-		{
-			unary_expr->set_modify(true);
-			//post_fix_expr->generate_code();
-		}
-	}
-	
 	if(unary_expr != NULL)
 	{
 		tag = set_offset(); 
@@ -1738,71 +1634,17 @@ void UnaryExpr::generate_code()
 
 		if(unary_op == "++")
 		{
-			unary_expr->set_inc_dec(true);
-			std::string rhs_tag;
-			if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
-
-			if(IsPointer[rhs_tag])
-			{
-				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",4" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-			}
-			else if(!IsArray[rhs_tag])
-			{
-				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-			}
-			else
-			{
-				unary_expr->set_inc_dec(false);
-				std::string rhs_tag; 
-				if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
-
-				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
-				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
-				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",1" << std::endl; 
-				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  
-				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
-			}
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",1" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
 		}
-
 		if(unary_op == "--")
 		{
-			unary_expr->set_inc_dec(true);
-			std::string rhs_tag;
-			if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
-		
-			if(IsPointer[rhs_tag])
-			{
-				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-4" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-			}
-			else if(!IsArray[rhs_tag])
-			{
-				os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-			}
-			else
-			{
-				unary_expr->set_inc_dec(false);
-				std::string rhs_tag; 
-				if(unary_expr != NULL) {unary_expr->get_tag(rhs_tag);}
-
-				os << "\tlw" << "\t$" << TMP2 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
-				os << "\tlw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl; 
-				os << "\taddi\t$" << TMP3 << ",$" << TMP3 << ",-1" << std::endl; 
-				os << "\tsw\t$" << TMP3 << ",0($" << TMP2 << ")" << std::endl;  
-				os << "\tsw" << "\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl;
-			}
-
+			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
+			os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-1" << std::endl; 
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;  
+			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
 		}
 		if(unary_op == "-")
 		{
@@ -1829,26 +1671,6 @@ void UnaryExpr::generate_code()
 			os << "\tmovz\t$" << TMP3 << ",$" << TMP2 << ",$" << TMP1 << std::endl; 
 			os << "\tsw\t$" << TMP3 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
 		}
-
-		if(unary_op == "*")
-		{
-			os << "\tlw\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl;
-			if(modify)
-			{
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 	
-			}
-			else
-			{
-				os << "\tlw\t$" << TMP1 << "," << "0($" << TMP1 << ")" << std::endl;
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-			}
-		}
-
-		if(unary_op == "&")
-		{
-			os << "\tla\t$" << TMP1 << "," << OffsetMap[rhs_tag] << "($fp)" << std::endl; 
-			os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl; 
-		}
 	}
 }
 void UnaryExpr::get_tag(std::string& _tag)
@@ -1871,22 +1693,16 @@ void UnaryExpr::get_max_arguments(int& _offset)
 }
 void UnaryExpr::get_type(std::string& _type)
 {
-	if(unary_op == "*") {_type = "pointer";}
 	if(post_fix_expr != NULL) {post_fix_expr->get_type(_type);}
 }
 void UnaryExpr::set_modify(bool status)
 {
-	if(unary_op == "*") {modify = status;}
 	if(post_fix_expr != NULL) {post_fix_expr->set_modify(status);}
 }
 void UnaryExpr::get_value(int& _value)
 {
 	if(post_fix_expr != NULL) {post_fix_expr->get_value(_value);}
 	if(unary_expr != NULL) {unary_expr->get_value(_value);}
-}
-void UnaryExpr::set_inc_dec(bool status)
-{
-	if(post_fix_expr != NULL) {post_fix_expr->set_inc_dec(status);}
 }
 
 PostFixExpr::PostFixExpr(PrimExpr* _prim_expr, PostFixExpr* _post_fix_expr, std::string _op, ArgList* _arg_list, Expr* _expr, bool _is_array) : prim_expr(_prim_expr), post_fix_expr(_post_fix_expr), op(_op), arg_list(_arg_list), expr(_expr), modify(false), is_array(_is_array), parent_inc_dec(false) {}
@@ -1958,15 +1774,8 @@ void PostFixExpr::generate_code()
 			post_fix_expr->set_inc_dec(true);
 			std::string lhs_tag;
 			if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
-			
-			if(IsPointer[lhs_tag])
-			{
-				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",4" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-			}
-			else if(!IsArray[lhs_tag])
+
+			if(!IsArray[lhs_tag])
 			{
 				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
 				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
@@ -1992,14 +1801,7 @@ void PostFixExpr::generate_code()
 			std::string lhs_tag;
 			if(post_fix_expr != NULL) {post_fix_expr->get_tag(lhs_tag);}
 			
-			if(IsPointer[lhs_tag])
-			{
-				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
-				os << "\taddi\t$" << TMP1 << ",$" << TMP1 << ",-4" << std::endl; 
-				os << "\tsw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
-			}
-			else if(!IsArray[lhs_tag])
+			if(!IsArray[lhs_tag])
 			{
 				os << "\tlw\t$" << TMP1 << "," << OffsetMap[lhs_tag] << "($fp)" << std::endl; 
 				os << "\tsw\t$" << TMP1 << "," << OffsetMap[tag] << "($fp)" << std::endl;  
@@ -2586,7 +2388,6 @@ void IfElseExpr::get_tag(std::string& _tag)
 	class IfElseExpr* IE_Expr;
 	class InitValList* Init_Val_List;
 	class TagStat* Tag_Stat;
-	class Pointer* Pntr;
 }
 
 %token SEMICOLON COMMA LCURLY RCURLY LBRAC RBRAC LSQBRAC RSQBRAC
@@ -2633,7 +2434,6 @@ void IfElseExpr::get_tag(std::string& _tag)
 %type<IE_Expr> ie_expr
 %type<Init_Val_List> init_val_list
 %type<Tag_Stat> tag_statement
-%type<Pntr> pointer
 
 %% 
 
@@ -2688,11 +2488,6 @@ declarator		: IDENTIFIER {$$ = new Declr($1);}
 				| declarator LBRAC RBRAC {$$ = new Declr("", $1, NULL, 1);}
 				| declarator LSQBRAC conditional_expr RSQBRAC {$$ = new Declr("",$1,NULL,0,$3,true);}
 				| declarator LSQBRAC RSQBRAC {$$ = new Declr("",$1,NULL,0,NULL,true);}
-				| pointer declarator {$$ = new Declr("",$2,NULL,0,NULL,false,$1);}
-				;
-
-pointer 		: MULT {$$ = new Pointer(NULL);}
-				| pointer MULT {$$ = new Pointer($1);}
 				;
 
 param_list		: param_decl {$$ = new ParamList($1);}
@@ -2734,7 +2529,7 @@ expr_statement 	: SEMICOLON {$$ = new ExprStat();}
 				| expr SEMICOLON {$$ = new ExprStat($1);}
 				;
 
-jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON {$$ = new JumpStat(NULL,"goto",$2);} 
+jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON {} 
 				| RETURN SEMICOLON {$$ = new JumpStat(NULL, "return");}
 				| RETURN expr SEMICOLON {$$ = new JumpStat($2, "return");}
 				| BREAK SEMICOLON {$$ = new JumpStat(NULL, "break");}

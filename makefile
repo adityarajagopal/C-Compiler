@@ -2,6 +2,7 @@
 
 bin/c_codegen : c_lexer.yy.o c_parser.tab.o
 	g++ -o bin/c_codegen c_parser.tab.o c_lexer.yy.o
+	@cat src/cow.out
 
 c_lexer.yy.o : c_lexer.yy.c c_parser.tab.h
 	g++ -c c_lexer.yy.c

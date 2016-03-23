@@ -43,6 +43,7 @@ class DoStat;
 class IfElseExpr;
 class InitValList;
 class TagStat;
+class Pointer;
 
 typedef std::string Tag;
 
@@ -155,15 +156,25 @@ private:
 	Declr* declr;
 	ParamList* param_list;
 	CondExpr* cond_expr;
+	Pointer* pointer; 
 	int func_dec;
 	bool is_array; 
 public:
-	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL, int _fd=0, CondExpr* _cond_expr=NULL, bool _is_array=false); 
+	Declr(std::string _id="", Declr* _declr=NULL, ParamList* _param_list=NULL, int _fd=0, CondExpr* _cond_expr=NULL, bool _is_array=false,Pointer* _pointer=NULL); 
 	void print(); 
 	void generate_code();
 	std::string get_id();
 	void get_tag(std::string& _tag);
 	void set_is_array();
+};
+
+class Pointer : public Node
+{
+private:
+	Pointer* pointer;
+public:
+	Pointer(Pointer* _pointer=NULL);
+	void print() {};
 };
 
 class InitVal : public Node
@@ -400,6 +411,7 @@ private:
 	PostFixExpr* post_fix_expr;
 	UnaryExpr* unary_expr;
 	std::string unary_op;
+	bool modify; 
 public:
 	UnaryExpr(PostFixExpr* _post_fix_expr=NULL, UnaryExpr* _unary_expr=NULL, std::string _unary_op="");
 	void print();

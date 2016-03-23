@@ -1,5 +1,5 @@
 file			: external_decl {$$ = new File($1); root = $$;} 
-	 			|; external_decl file  {$$ = new File($1, $2); root = $$;}
+	 			| external_decl file  {$$ = new File($1, $2); root = $$;}
 				;
 
 external_decl	: function_def {$$ = new ExternalDecl($1);}
@@ -41,11 +41,19 @@ statement		: compound_statement {}
 				| selection_statement {}
 				| loop_statement {}
 				| jump_statement {}
+				| tag_statement {}
 				;
 
 declarator		: IDENTIFIER {$$ = new Declr($1);} 
 				| declarator LBRAC param_list RBRAC {$$ = new Declr("", $1, $3, 1);} 
-				| declarator LBRAC RBRAC {$$ = new Declr("", $1,NULL, 1);}
+				| declarator LBRAC RBRAC {$$ = new Declr("", $1, NULL, 1);}
+				| declarator LSQBRAC conditional_expr RSQBRAC {$$ = new Declr("",$1,NULL,0,$3,true);}
+				| declarator LSQBRAC RSQBRAC {$$ = new Declr("",$1,NULL,0,NULL,true);}
+				| pointer declarator {$$ = new Declr("",$2,NULL,0,NULL,false,$1);}
+				;
+
+pointer 		: MULT {$$ = new Pointer(NULL);}
+				| pointer MULT {$$ = new Pointer($1);}
 				;
 
 param_list		: param_decl {$$ = new ParamList($1);}
@@ -62,10 +70,16 @@ compound_statement	: LCURLY RCURLY {$$ = new CompStat();}
 					;
 
 initial_val		: assign_expr {$$ = new InitVal($1);}
+				| LCURLY init_val_list RCURLY {$$ = new InitVal(NULL,$2);}
+				;
+
+init_val_list 	: initial_val {$$ = new InitValList($1);}
+				| initial_val COMMA init_val_list {$$ = new InitValList($1,$3);}
 				;
 
 selection_statement : IF LBRAC expr RBRAC statement {$$ = new SelecStat($3,$5);} 
 					| IF LBRAC expr RBRAC statement ELSE statement {$$ = new SelecStat($3,$5,$7);}
+					| SWITCH LBRAC expr RBRAC statement {$$ = new SelecStat($3,NULL,NULL,$5);}
 					;
 
 loop_statement	: WHILE LBRAC expr RBRAC statement {$$ = new LoopStat(NULL,NULL,$3,$5);}
@@ -81,10 +95,16 @@ expr_statement 	: SEMICOLON {$$ = new ExprStat();}
 				| expr SEMICOLON {$$ = new ExprStat($1);}
 				;
 
-jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON {} 
+jump_statement	: GOTO_KWD IDENTIFIER SEMICOLON {$$ = new JumpStat(NULL,"goto",$2);} 
 				| RETURN SEMICOLON {$$ = new JumpStat(NULL, "return");}
-				| RETURN expr SEMICOLON {$$ = new JumpStat($2, "return");} 
+				| RETURN expr SEMICOLON {$$ = new JumpStat($2, "return");}
+				| BREAK SEMICOLON {$$ = new JumpStat(NULL, "break");}
 				;
+
+tag_statement 	: IDENTIFIER COLON statement {$$ = new TagStat($3, NULL, $1);}
+				| CASE conditional_expr COLON statement {$$ = new TagStat($4,$2);}
+				| DEFAULT COLON statement {$$ = new TagStat($3);}
+				;				
 
 expr			: assign_expr {$$ = new Expr($1);}  
 				| expr COMMA assign_expr {$$ = new Expr($3,$1);}
@@ -181,10 +201,11 @@ postfix_expr	: primary_expr {$$ = new PostFixExpr($1);}
 				| postfix_expr LBRAC argument_list RBRAC {$$ = new PostFixExpr(NULL,$1,"",$3);}
 				| postfix_expr INC {$$ = new PostFixExpr(NULL, $1, $2);}
 				| postfix_expr DEC {$$ = new PostFixExpr(NULL, $1, $2);}
+				| postfix_expr LSQBRAC expr RSQBRAC {$$ = new PostFixExpr(NULL, $1, "", NULL, $3,true);}
 				;
 
 argument_list 	: assign_expr {$$ = new ArgList($1);}
-				| argument_list COMMA assign_expr {$$ = new ArgList($3,$1);}
+				| assign_expr COMMA argument_list {$$ = new ArgList($1,$3);}
 				;
 
 primary_expr	: IDENTIFIER {$$ = new PrimExpr($1,0);} 
@@ -196,3 +217,4 @@ primary_expr	: IDENTIFIER {$$ = new PrimExpr($1,0);}
 				| STRING {$$ = new PrimExpr($1,6);}  
 				| LBRAC expr RBRAC {$$ = new PrimExpr("",-1,$2);}
 				;
+l
