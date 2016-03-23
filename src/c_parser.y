@@ -533,7 +533,7 @@ void AssExpr::generate_code()
 	{
 		std::string type; 
 		if(unary_expr != NULL) {unary_expr->get_type(type);}
-		if(type == "array") {unary_expr->set_modify(true);}
+		if(type == "array" || type == "pointer") {unary_expr->set_modify(true);}
 		unary_expr->generate_code();
 	}
 	
@@ -1876,7 +1876,7 @@ void UnaryExpr::get_type(std::string& _type)
 }
 void UnaryExpr::set_modify(bool status)
 {
-	//if(unary_op == "*") {modify = status;}
+	if(unary_op == "*") {modify = status;}
 	if(post_fix_expr != NULL) {post_fix_expr->set_modify(status);}
 }
 void UnaryExpr::get_value(int& _value)
